@@ -1,392 +1,351 @@
-# Contributing to Voicebox
+# Voicebox 기여 가이드
 
-Thank you for your interest in contributing to Voicebox! This document provides guidelines and instructions for contributing.
+Voicebox 프로젝트에 관심을 가져주셔서 감사합니다! 이 문서는 프로젝트 기여를 위한 가이드라인과 안내를 제공합니다.
 
-## Code of Conduct
+## 행동 강령 (Code of Conduct)
 
-- Be respectful and inclusive
-- Welcome newcomers and help them learn
-- Focus on constructive feedback
-- Respect different viewpoints and experiences
+- 상호 존중하고 포용적인 태도를 유지합니다.
+- 새로운 기여자를 환영하고 배움을 돕습니다.
+- 건설적인 피드백에 집중합니다.
+- 다양한 관점과 경험을 존중합니다.
 
-## Getting Started
+## 시작하기
 
-### Prerequisites
+### 사전 요구사항
 
-- **[Bun](https://bun.sh)** - Fast JavaScript runtime and package manager
+- **[Bun](https://bun.sh)** - 빠른 JavaScript 런타임 및 패키지 관리자
   ```bash
   curl -fsSL https://bun.sh/install | bash
   ```
 
-- **[Python 3.11+](https://python.org)** - For backend development
+- **[Python 3.11+](https://python.org)** - 백엔드 개발용
   ```bash
-  python --version  # Should be 3.11 or higher
+  python --version  # 3.11 이상이어야 함
   ```
 
-- **[Rust](https://rustup.rs)** - For Tauri desktop app (installed automatically by Tauri CLI)
+- **[Rust](https://rustup.rs)** - Tauri 데스크톱 앱용 (Tauri CLI 설치 시 자동 설치 지원)
   ```bash
-  rustc --version  # Check if installed
+  rustc --version  # 설치 여부 확인
   ```
-- **[Tauri Prerequisites](https://v2.tauri.app/start/prerequisites)** - Tauri-specific system dependencies (varies by OS).
+- **[Tauri 사전 요구사항](https://v2.tauri.app/start/prerequisites)** - OS별 Tauri 시스템 의존성.
 
-- **Git** - Version control
+- **Git** - 버전 관리
 
-### Development Setup
+### 개발 환경 설정
 
-Install [just](https://github.com/casey/just) (`brew install just`, `cargo install just`, or `winget install Casey.Just`), then:
+[just](https://github.com/casey/just)를 설치합니다 (`brew install just`, `cargo install just`, 또는 `winget install Casey.Just`):
 
 ```bash
-git clone https://github.com/YOUR_USERNAME/voicebox.git
+git clone https://github.com/kpopsoft-collab/voicebox.git
 cd voicebox
 
-just setup   # creates venv, installs Python + JS deps
-just dev     # starts backend + desktop app
+just setup   # 가상환경(venv) 생성 및 Python + JS 의존성 자동 설치
+just dev     # 백엔드 + 데스크톱 앱 동시 실행
 ```
 
-`just setup` handles everything automatically, including:
-- Creating a Python virtual environment
-- Installing Python dependencies (with CUDA PyTorch on Windows if an NVIDIA GPU is detected)
-- Installing MLX dependencies on Apple Silicon
-- Installing JavaScript dependencies
+`just setup` 명령은 다음 작업을 자동으로 처리합니다:
+- Python 가상환경(venv) 생성
+- Python 의존성 설치 (Windows NVIDIA GPU 환경 시 CUDA PyTorch 자동 감지 설치)
+- Apple Silicon 환경 시 MLX 의존성 설치
+- JavaScript/TypeScript 의존성 설치
 
-`just dev` starts the backend and desktop app together. If a backend is already running (e.g. from `just dev-backend` in another terminal), it detects it and only starts the frontend.
+`just dev`는 백엔드와 데스크톱 앱을 함께 시작합니다. 백엔드가 이미 실행 중인 경우(예: 다른 터미널에서 `just dev-backend` 실행 중), 이를 감지하여 프론트엔드만 시작합니다.
 
-Other useful commands:
+기타 유용한 명령어:
 
 ```bash
-just dev-web       # backend + web app (no Tauri/Rust build)
-just dev-backend   # backend only
-just dev-frontend  # Tauri app only (backend must be running)
-just kill          # stop all dev processes
-just clean-all     # nuke everything and start fresh
-just --list        # see all available commands
+just dev-web       # 백엔드 + 웹 앱 (Tauri/Rust 빌드 제외)
+just dev-backend   # 백엔드만 실행
+just dev-frontend  # Tauri 데스크톱 앱만 실행 (백엔드가 실행 중이어야 함)
+just kill          # 실행 중인 모든 개발 프로세스 종료
+just clean-all     # 모든 빌드 파일 및 캐시를 완전히 초기화
+just --list        # 사용 가능한 모든 명령어 목록 보기
 ```
 
-> **Note:** In dev mode, the app connects to a manually-started Python server.
-> The bundled server binary is only used in production builds.
+> **참고:** 개발(dev) 모드에서는 수동으로 실행한 Python 서버에 연결됩니다.
+> 번들링된 서버 바이너리는 프로덕션 릴리스 빌드에서만 사용됩니다.
 
-#### Windows Notes
+#### Windows 사용자 참고사항
 
-The justfile works natively on Windows via PowerShell. No WSL or Git Bash required. On Windows with an NVIDIA GPU, `just setup` automatically installs CUDA-enabled PyTorch for GPU acceleration.
+justfile은 PowerShell을 통해 Windows에서 네이티브로 실행됩니다 (WSL 또는 Git Bash 불필요). NVIDIA GPU가 장착된 Windows 환경에서는 `just setup`이 GPU 가속을 위해 CUDA 지원 PyTorch를 자동으로 설치합니다.
 
-### Model Downloads
+### AI 모델 다운로드
 
-Models are automatically downloaded from HuggingFace Hub on first use:
-- **Whisper** (transcription): Auto-downloads on first transcription
-- **Qwen3-TTS** (voice cloning): Auto-downloads on first generation (~2-4GB)
+모델은 처음 사용할 때 HuggingFace Hub에서 자동으로 다운로드됩니다:
+- **Whisper** (음성 전사/STT): 최초 전사 실행 시 자동 다운로드
+- **Qwen3-TTS** (음성 복제/TTS): 최초 음성 생성 시 자동 다운로드 (~2-4GB)
 
-First-time usage will be slower due to model downloads, but subsequent runs will use cached models.
+첫 실행 시에는 모델 다운로드로 인해 시간이 소요될 수 있으나, 이후 실행부터는 캐시된 로컬 모델을 즉시 로딩합니다.
 
-### Building
+### 빌드하기
 
-**Build production app:**
+**프로덕션 앱 빌드:**
 
 ```bash
-just build        # Build CPU server binary + Tauri installer
+just build        # CPU 서버 바이너리 + Tauri 인스톨러 빌드
 ```
 
-On Windows, to build with CUDA support for local testing:
+Windows에서 로컬 테스트를 위해 CUDA 지원 빌드를 진행할 경우:
 
 ```bash
-just build-local  # Build CPU + CUDA server binaries + Tauri installer
+just build-local  # CPU + CUDA 서버 바이너리 + Tauri 인스톨러 빌드
 ```
 
-This builds the CPU sidecar (bundled with the app), the CUDA binary (placed in `%APPDATA%/sh.voicebox.app/backends/` for runtime GPU switching), and the installable Tauri app.
+이 명령은 CPU 사이드카(앱 번들 내 포함), CUDA 바이너리(런타임 GPU 전환을 위해 `%APPDATA%/sh.voicebox.app/backends/`에 배치), 설치 가능한 Tauri 앱을 생성합니다.
 
-Creates platform-specific installers (`.dmg`, `.msi`, `.AppImage`) in `tauri/src-tauri/target/release/bundle/`.
+플랫폼별 인스톨러(`.dmg`, `.msi`, `.AppImage`)는 `tauri/src-tauri/target/release/bundle/`에 생성됩니다.
 
-**Individual build targets:**
+**개별 빌드 타깃:**
 
 ```bash
-just build-server       # CPU server binary only
-just build-server-cuda  # CUDA server binary only (Windows)
-just build-tauri        # Tauri desktop app only
-just build-web          # Web app only
+just build-server       # CPU 서버 바이너리만 빌드
+just build-server-cuda  # CUDA 서버 바이너리만 빌드 (Windows)
+just build-tauri        # Tauri 데스크톱 앱만 빌드
+just build-web          # 웹 앱만 빌드
 ```
 
-**Building with local Qwen3-TTS development version:**
+**로컬 Qwen3-TTS 개발 버전으로 빌드:**
 
-If you're actively developing or modifying the Qwen3-TTS library, set the `QWEN_TTS_PATH` environment variable to point to your local clone:
+Qwen3-TTS 라이브러리를 직접 개발하거나 수정 중인 경우, `QWEN_TTS_PATH` 환경 변수에 로컬 클론 경로를 지정하세요:
 
 ```bash
 export QWEN_TTS_PATH=~/path/to/your/Qwen3-TTS
 just build-server
 ```
 
-This makes PyInstaller use your local qwen-tts version instead of the pip-installed package.
+이렇게 하면 PyInstaller가 pip 설치 패키지 대신 사용자의 로컬 qwen-tts 버전을 사용합니다.
 
-### Generate OpenAPI Client
+### OpenAPI 클라이언트 생성
 
-After starting the backend server:
+백엔드 서버를 시작한 후:
 ```bash
 ./scripts/generate-api.sh
 ```
-This downloads the OpenAPI schema and generates the TypeScript client in `app/src/lib/api/`
+OpenAPI 스키마를 다운로드하고 `app/src/lib/api/` 경로에 TypeScript 클라이언트를 자동 생성합니다.
 
-### Convert Assets to Web Formats
+### 웹 포맷으로 에셋 변환
 
-To optimize images and videos for the web, run:
+웹 최적화를 위해 이미지와 비디오를 압축 변환하려면 다음을 실행하세요:
 ```bash
 bun run convert:assets
 ```
 
-This script:
-- Converts PNG → WebP (better compression, same quality)
-- Converts MOV → WebM (VP9 codec, smaller file size)
-- Processes files in `landing/public/` and `docs/public/`
-- **Deletes original files** after successful conversion
+이 스크립트는 다음 작업을 수행합니다:
+- PNG → WebP 변환 (화질 유지, 더 높은 압축률)
+- MOV → WebM 변환 (VP9 코덱, 적은 파일 크기)
+- `landing/public/` 및 `docs/public/` 내 파일 처리
+- 변환 성공 후 **원본 파일 자동 삭제**
 
-**Requirements:** Install `webp` and `ffmpeg`:
+**필수 요구사항:** `webp` 및 `ffmpeg` 설치:
 ```bash
 brew install webp ffmpeg
 ```
 
-> **Note:** Run this before committing new images or videos to keep the repository size small.
+> **참고:** 저장소 크기를 작게 유지하기 위해 새 이미지나 동영상을 커밋하기 전에 이 스크립트를 실행해 주세요.
 
-## Development Workflow
+## 개발 워크플로우
 
-### 1. Create a Branch
-
-```bash
-git checkout -b feature/your-feature-name
-# or
-git checkout -b fix/your-bug-fix
-```
-
-### 2. Make Your Changes
-
-- Write clean, readable code
-- Follow existing code style
-- Add comments for complex logic
-- Update documentation as needed
-
-### 3. Test Your Changes
-
-- Test manually in the app
-- Ensure backend API endpoints work
-- Check for TypeScript/Python errors
-- Verify UI components render correctly
-
-### 4. Commit Your Changes
-
-Write clear, descriptive commit messages:
+### 1. 브랜치 생성
 
 ```bash
-git commit -m "Add feature: voice profile export"
-git commit -m "Fix: audio playback stops after 30 seconds"
+git checkout -b feature/기능이름
+# 또는
+git checkout -b fix/버그수정이름
 ```
 
-### 5. Push and Create Pull Request
+### 2. 코드 작성
+
+- 깔끔하고 읽기 쉬운 코드 작성
+- 기존 코드 스타일 준수
+- 복잡한 로직에는 이유(Why) 중심의 주석 작성
+- 필요에 따라 관련 문서 업데이트
+
+### 3. 변경사항 테스트
+
+- 앱에서 직접 수동 테스트 수행
+- 백엔드 API 엔드포인트 동작 확인
+- TypeScript 및 Python 컴파일 에러 확인
+- UI 컴포넌트 정상 렌더링 확인
+
+### 4. 커밋 메시지 작성
+
+명확하고 설명력 있는 커밋 메시지를 작성합니다:
 
 ```bash
-git push origin feature/your-feature-name
+git commit -m "feat: 음성 프로필 내보내기 기능 추가"
+git commit -m "fix: 30초 후 오디오 재생이 중단되는 문제 수정"
 ```
 
-Then create a pull request on GitHub with:
-- Clear description of changes
-- Screenshots (for UI changes)
-- Reference to related issues
+### 5. 푸시 및 풀 리퀘스트(PR) 생성
 
-## Code Style
+```bash
+git push origin feature/기능이름
+```
 
-### TypeScript/React
+GitHub에서 다음 내용을 포함하여 PR을 생성합니다:
+- 변경사항에 대한 명확한 설명
+- UI 변경 시 스크린샷 첨부
+- 관련된 이슈 링크 연결
 
-- Use TypeScript strict mode
-- Follow React best practices
-- Use functional components with hooks
-- Prefer named exports
-- Format with Biome (runs automatically)
+## 코드 스타일 가이드
+
+### TypeScript / React
+
+- TypeScript strict 모드 사용
+- React 모범 사례 준수
+- Hook 기반의 함수형 컴포넌트 작성
+- Named export 선호
+- Biome 포맷터 준수
 
 ```typescript
-// Good
+// 올바른 예시
 export function ProfileCard({ profile }: { profile: Profile }) {
   return <div>{profile.name}</div>;
 }
 
-// Avoid
+// 지양할 예시
 export const ProfileCard = (props) => { ... }
 ```
 
 ### Python
 
-- Follow PEP 8 style guide
-- Use type hints
-- Use async/await for I/O operations
-- Format with Black (if configured)
+- PEP 8 스타일 가이드 준수
+- Type hint 명시
+- I/O 작업 시 async/await 사용
+- Black 포맷터 스타일 준수
 
 ```python
-# Good
+# 올바른 예시
 async def create_profile(name: str, language: str) -> Profile:
-    """Create a new voice profile."""
+    """새로운 음성 프로필을 생성합니다."""
     ...
 
-# Avoid
+# 지양할 예시
 def create_profile(name, language):
     ...
 ```
 
 ### Rust
 
-- Follow Rust conventions
-- Use meaningful variable names
-- Handle errors explicitly
-- Format with `rustfmt`
+- Rust 표준 컨벤션 준수
+- 의미 있는 변수명 사용
+- 에러 명시적 처리
+- `rustfmt` 포맷팅 준수
 
-## Project Structure
+## 프로젝트 구조
 
 ```
 voicebox/
-├── app/              # Shared React frontend
+├── app/              # 공유 React 프론트엔드
 │   └── src/
-│       ├── components/   # UI components
-│       ├── lib/          # Utilities and API client
-│       └── hooks/        # React hooks
-├── backend/          # Python FastAPI server
-│   ├── main.py       # API routes
-│   ├── tts.py        # Voice synthesis
+│       ├── components/   # UI 컴포넌트
+│       ├── lib/          # 유틸리티 및 API 클라이언트
+│       └── hooks/        # React 커스텀 훅
+├── backend/          # Python FastAPI 서버
+│   ├── main.py       # API 라우트 및 진입점
+│   ├── tts.py        # 음성 합성 엔진 관리
 │   └── ...
-├── tauri/            # Desktop app wrapper
-│   └── src-tauri/    # Rust backend
-└── scripts/          # Build scripts
+├── tauri/            # 데스크톱 앱 래퍼
+│   └── src-tauri/    # Rust 백엔드
+└── scripts/          # 빌드 및 릴리스 스크립트
 ```
 
-## Areas for Contribution
+## 기여 가능한 분야
 
-### 🐛 Bug Fixes
+### 🐛 버그 수정
 
-- Check existing issues for bugs to fix
-- Test your fix thoroughly
-- Add tests if possible
+- 이슈 목록에서 미해결 버그 확인
+- 버그 수정 후 철저한 테스트 진행
+- 가능한 경우 재현 방지 테스트 추가
 
-### ✨ New Features
+### ✨ 신규 기능 개발
 
-- Check the roadmap in README.md and the engineering status in [`docs/PROJECT_STATUS.md`](docs/PROJECT_STATUS.md) before proposing work — it lists prioritized tasks (Tier 1 → 3), known architectural bottlenecks, and candidate TTS engines already under evaluation (including why some have been backlogged)
-- Discuss major features in an issue first
-- Keep features focused and well-scoped
+- 제안하기 전 README.md의 로드맵과 [`docs/PROJECT_STATUS.md`](docs/PROJECT_STATUS.md)의 상태를 먼저 확인하세요.
+- 대규모 기능은 먼저 이슈를 통해 논의
+- 기능의 범위를 명확히 유지
 
-### 📚 Documentation
+### 📚 문서화
 
-- Improve README clarity
-- Add code comments
-- Write API documentation
-- Create tutorials or guides
+- README 설명 개선
+- 코드 주석 및 API 문서 작성
+- 튜토리얼 및 사용자 가이드 작성
 
-### 🎨 UI/UX Improvements
+### 🎨 UI/UX 개선
 
-- Improve accessibility
-- Enhance visual design
-- Optimize performance
-- Add animations/transitions
+- 웹 접근성 향상
+- 시각적 디자인 완성도 제고
+- 렌더링 성능 최적화
+- 애니메이션 및 부드러운 전환 효과 추가
 
-### 🔧 Infrastructure
+### 🔧 인프라 및 빌드
 
-- Improve build process
-- Add CI/CD improvements
-- Optimize bundle size
-- Add testing infrastructure
+- 빌드 프로세스 개선
+- CI/CD 파이프라인 최적화
+- 번들 사이즈 최소화
+- 테스트 자동화 인프라 강화
 
-## API Development
+## API 개발 가이드
 
-When adding new API endpoints:
+새로운 API 엔드포인트를 추가할 때:
 
-1. **Add route in `backend/main.py`**
-2. **Create Pydantic models in `backend/models.py`**
-3. **Implement business logic in appropriate module**
-4. **Update OpenAPI schema** (automatic with FastAPI)
-5. **Regenerate TypeScript client:**
+1. **`backend/routes/`에 라우트 추가**
+2. **`backend/models.py`에 Pydantic 모델 정의**
+3. **해당 모듈에 비즈니스 로직 구현**
+4. **OpenAPI 스키마 업데이트** (FastAPI 자동 지원)
+5. **TypeScript 클라이언트 재생성:**
    ```bash
    bun run generate:api
    ```
-6. **Update `backend/README.md`** with endpoint documentation
+6. **API 문서 업데이트**
 
-## Testing
+## 테스트
 
-Currently, testing is primarily manual. When adding tests:
+현재는 주로 수동 검증을 진행합니다. 자동 테스트 추가 시:
 
-- **Backend**: Use pytest for Python tests
-- **Frontend**: Use Vitest for React component tests
-- **E2E**: Use Playwright for end-to-end tests (future)
+- **백엔드**: pytest 활용
+- **프론트엔드**: Vitest 활용
+- **E2E**: Playwright 활용
 
-## Pull Request Process
+## 풀 리퀘스트(PR) 체크리스트
 
-1. **Update documentation** if needed
-2. **Ensure code follows style guidelines**
-3. **Test your changes thoroughly**
-4. **Update CHANGELOG.md** with your changes
-5. **Request review** from maintainers
+- [ ] 코드가 프로젝트 스타일 가이드를 준수하는가?
+- [ ] 관련 문서가 업데이트되었는가?
+- [ ] 변경사항이 로컬에서 정상 테스트되었는가?
+- [ ] Breaking change가 없거나 명시적으로 문서화되었는가?
+- [ ] CHANGELOG.md가 업데이트되었는가?
 
-### PR Checklist
+## 릴리스 프로세스
 
-- [ ] Code follows style guidelines
-- [ ] Documentation updated
-- [ ] Changes tested
-- [ ] No breaking changes (or documented)
-- [ ] CHANGELOG.md updated
+릴리스는 메인테이너에 의해 관리됩니다:
 
-## Release Process
-
-Releases are managed by maintainers:
-
-1. **Bump version using bumpversion:**
+1. **bumpversion을 이용한 버전 업데이트:**
    ```bash
-   # Install bumpversion (if not already installed)
-   pip install bumpversion
-   
-   # Bump patch version (0.1.0 -> 0.1.1)
+   # 패치 버전 올리기 (0.1.0 -> 0.1.1)
    bumpversion patch
    
-   # Or bump minor version (0.1.0 -> 0.2.0)
+   # 마이너 버전 올리기 (0.1.0 -> 0.2.0)
    bumpversion minor
    
-   # Or bump major version (0.1.0 -> 1.0.0)
+   # 메이저 버전 올리기 (0.1.0 -> 1.0.0)
    bumpversion major
    ```
    
-   This automatically:
-   - Updates version numbers in all files (`tauri.conf.json`, `Cargo.toml`, all `package.json` files, `backend/main.py`)
-   - Creates a git commit with the version bump
-   - Creates a git tag (e.g., `v0.1.1`, `v0.2.0`)
+   이 작업은 모든 파일(`tauri.conf.json`, `Cargo.toml`, 모든 `package.json`, `backend/main.py`)의 버전 번호를 업데이트하고 git 커밋 및 태그를 자동 생성합니다.
 
-2. **Update CHANGELOG.md** with release notes
+2. **CHANGELOG.md에 릴리스 노트 업데이트**
 
-3. **Push commits and tags:**
+3. **커밋 및 태그 푸시:**
    ```bash
    git push
    git push --tags
    ```
 
-4. **GitHub Actions builds and releases** automatically when tags are pushed
+4. **GitHub Actions가 태그 푸시 시 자동으로 빌드 및 릴리스를 수행합니다.**
 
-## Troubleshooting
+## 라이선스
 
-See [docs/content/docs/overview/troubleshooting.mdx](docs/content/docs/overview/troubleshooting.mdx) for common issues and solutions.
-
-**Quick fixes:**
-
-- **Backend won't start:** Check Python version (3.11+), ensure venv is activated, install dependencies
-- **Tauri build fails:** Ensure Rust is installed, clean build with `cd tauri/src-tauri && cargo clean`
-- **OpenAPI client generation fails:** Ensure backend is running, check `curl http://localhost:17493/openapi.json`
-
-## Questions?
-
-- Open an issue for bugs or feature requests
-- Check existing issues and discussions
-- Review the codebase to understand patterns
-- See [docs/content/docs/overview/troubleshooting.mdx](docs/content/docs/overview/troubleshooting.mdx) for common issues
-
-## Additional Resources
-
-- [README.md](README.md) - Project overview
-- [backend/README.md](backend/README.md) - API documentation
-- [docs/PROJECT_STATUS.md](docs/PROJECT_STATUS.md) - Living engineering roadmap: architecture, shipped vs in-flight work, prioritized open issues, candidate TTS engines under evaluation, architectural bottlenecks. Keep this updated when you ship significant features, close or backlog a model integration, or identify new bottlenecks.
-- [docs/AUTOUPDATER_QUICKSTART.md](docs/AUTOUPDATER_QUICKSTART.md) - Auto-updater setup
-- [SECURITY.md](SECURITY.md) - Security policy
-- [CHANGELOG.md](CHANGELOG.md) - Version history
-
-## License
-
-By contributing, you agree that your contributions will be licensed under the MIT License.
+프로젝트에 기여함으로써 귀하의 기여물이 MIT 라이선스 하에 배포되는 것에 동의하게 됩니다.
 
 ---
 
-Thank you for contributing to Voicebox! 🎉
+Voicebox 프로젝트에 기여해 주셔서 감사합니다! 🎉

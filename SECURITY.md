@@ -1,92 +1,92 @@
-# Security Policy
+# 보안 정책 (Security Policy)
 
-## Supported Versions
+## 지원되는 버전
 
-We release patches for security vulnerabilities. Which versions are eligible for receiving such patches depends on the CVSS v3.0 Rating:
+보안 취약점에 대한 패치를 주기적으로 릴리스합니다. 패치 적용 대상 버전은 다음과 같습니다:
 
-| Version | Supported          |
-| ------- | ------------------ |
-| 0.3.x   | :white_check_mark: |
-| < 0.3   | :x:                |
+| 버전     | 지원 여부           |
+| -------- | ------------------ |
+| 0.3.x    | :white_check_mark: |
+| < 0.3    | :x:                |
 
-## Reporting a Vulnerability
+## 취약점 보고 방법
 
-If you discover a security vulnerability, please report it responsibly:
+보안 취약점을 발견하신 경우, 다음 절차에 따라 안전하게 보고해 주시기 바랍니다:
 
-1. **Do not** open a public GitHub issue
-2. Email security details to: [security@voicebox.sh](mailto:security@voicebox.sh)
-3. Include:
-   - Description of the vulnerability
-   - Steps to reproduce
-   - Potential impact
-   - Suggested fix (if any)
+1. **공개 GitHub Issue를 생성하지 마세요.**
+2. 보안 관련 세부 내용을 [security@voicebox.sh](mailto:security@voicebox.sh)로 이메일 발송해 주세요.
+3. 이메일 포함 항목:
+   - 취약점에 대한 설명
+   - 재현 절차 (단계별 설명)
+   - 잠재적 영향도
+   - 권장 수정안 (있는 경우)
 
-We will:
-- Acknowledge receipt within 48 hours
-- Provide a timeline for addressing the issue
-- Keep you informed of progress
-- Credit you in the security advisory (if desired)
+운영팀은 다음과 같이 대응합니다:
+- 48시간 이내에 접수 확인 메일을 발송합니다.
+- 문제 해결을 위한 일정 및 로드맵을 제공합니다.
+- 진행 상황을 지속적으로 공유합니다.
+- 보안 권고문(Security Advisory)에 기여자로 명시합니다 (요청 시).
 
-## Security Best Practices
+## 보안 모범 사례
 
-### For Users
+### 사용자 가이드
 
-- **Keep Voicebox updated** - Updates include security patches
-- **Verify downloads** - Only download from official releases
-- **Local processing** - Voice data stays on your machine
-- **Network security** - Use HTTPS when connecting to remote servers
+- **Voicebox 최신 버전 유지** - 업데이트에는 최신 보안 패치가 포함됩니다.
+- **다운로드 출처 검증** - 공식 GitHub 릴리스 및 공식 웹사이트에서만 다운로드하세요.
+- **로컬 처리 원칙** - 음성 데이터 및 AI 모델은 사용자의 로컬 머신에서만 안전하게 처리됩니다.
+- **네트워크 보안** - 원격 서버에 연결할 때는 반드시 HTTPS 및 보안 통신을 사용하세요.
 
-### For Developers
+### 개발자 가이드
 
-- **Dependencies** - Keep all dependencies up to date
-- **Code review** - All PRs require review before merging
-- **Secrets** - Never commit API keys or signing keys
-- **Signing** - All releases are cryptographically signed
+- **의존성 관리** - 모든 외부 라이브러리와 의존성을 최신 상태로 유지합니다.
+- **코드 리뷰** - 모든 PR은 머지 전 엄격한 코드 리뷰를 거칩니다.
+- **비밀 정보 관리** - API 키, 서명 키, 인증 토큰 등을 절대 코드에 하드코딩하거나 커밋하지 않습니다.
+- **서명 검증** - 모든 프로덕션 릴리스 바이너리는 암호학적으로 서명됩니다.
 
-## Known Security Considerations
+## 주요 보안 고려사항
 
-### Local Processing
+### 로컬 처리 (Local Processing)
 
-Voicebox processes all audio locally by default. Your voice data never leaves your machine unless you explicitly enable remote server mode.
+Voicebox는 기본적으로 모든 오디오 데이터를 로컬에서 처리합니다. 사용자가 명시적으로 원격 서버 모드를 활성화하지 않는 한 음성 데이터는 절대 외부로 유출되지 않습니다.
 
-### Remote Server Mode
+### 원격 서버 모드 (Remote Server Mode)
 
-When connecting to a remote server:
-- Ensure the server is on a trusted network
-- Use HTTPS for remote connections
-- Verify server identity before connecting
+원격 서버에 연결하여 사용할 경우:
+- 신뢰할 수 있는 네트워크 환경인지 확인하세요.
+- 원격 통신 시 반드시 HTTPS/TLS를 사용하세요.
+- 연결 전 서버 신원을 검증하세요.
 
-### Auto-Updates
+### 자동 업데이트 (Auto-Updates)
 
-- Updates are cryptographically signed
-- Signature verification happens before installation
-- Only HTTPS endpoints are allowed
+- 모든 업데이트 파일은 암호학적으로 서명됩니다.
+- 설치 전 서명 검증이 자동으로 수행됩니다.
+- 오직 HTTPS 엔드포인트만 허용됩니다.
 
-### Python Server
+### Python 서버
 
-The embedded Python server:
-- Runs locally by default (localhost only)
-- Can be configured for remote access
-- Uses standard FastAPI security practices
+내장된 Python FastAPI 서버:
+- 기본적으로 로컬(localhost)에서만 바인딩되어 실행됩니다.
+- 원격 접근용으로 설정 가능합니다.
+- 표준 FastAPI 보안 프랙티스를 준수합니다.
 
-## Disclosure Timeline
+## 취약점 처리 일정 (Disclosure Timeline)
 
-- **Day 0**: Vulnerability reported
-- **Day 1-2**: Initial assessment and acknowledgment
-- **Day 3-7**: Investigation and fix development
-- **Day 8-14**: Testing and release preparation
-- **Day 15+**: Public disclosure (if applicable)
+- **0일차**: 취약점 접수
+- **1~2일차**: 초기 영향도 평가 및 접수 확인 회신
+- **3~7일차**: 상세 분석 및 패치 코드 개발
+- **8~14일차**: 패치 검증 테스트 및 릴리스 준비
+- **15일차 이후**: 패치 릴리스 및 보안 공지(Advisory) 게시
 
-Timeline may vary based on severity and complexity.
+심각도와 복잡도에 따라 일정은 조정될 수 있습니다.
 
-## Security Updates
+## 보안 업데이트 배포
 
-Security updates will be:
-- Released as patch versions (e.g., 0.3.2)
-- Documented in CHANGELOG.md
-- Announced via GitHub releases
-- Automatically delivered via auto-updater
+보안 업데이트는 다음과 같이 배포됩니다:
+- 패치 버전(예: 0.3.2)으로 신속 릴리스
+- CHANGELOG.md에 상세 내용 기록
+- GitHub Release를 통해 공식 공지
+- 인앱 자동 업데이터를 통해 자동 전달
 
 ---
 
-Thank you for helping keep Voicebox secure! 🔒
+Voicebox를 안전하게 유지하는 데 도움을 주셔서 감사합니다! 🔒
