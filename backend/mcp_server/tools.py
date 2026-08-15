@@ -208,20 +208,18 @@ def register_tools(mcp: FastMCP) -> None:
         finally:
             db.close()
 
-    # ── 3. voicebox.hachuping (하츄핑 전용 완벽 재현 실시간 발화) ────────────
+    # ── 3. voicebox.hachuping (하츄핑 프로필 웹 UI와 100% 동일 발화) ────────────
     @mcp.tool(
         name="voicebox.hachuping",
         description=(
-            "Speak directly in the authentic 'Hachuping' (하츄핑) anime voice. "
-            "Automatically applies high-pitch fairy tone (Pitch Shift +3.5), "
-            "playful ~츄 ending style, and character persona with zero extra configuration."
+            "Speak directly in the registered 'Hachuping' (하츄핑) profile. "
+            "100% identical to generating audio from the Voicebox web UI."
         ),
     )
     async def voicebox_hachuping(
         text: str,
-        pitch_shift: float = 3.5,
     ) -> dict[str, Any]:
-        """Speak in authentic Hachuping fairy voice with pitch correction."""
+        """Speak using the exact Hachuping profile identical to web UI."""
         db = next(get_db())
         try:
             vp = resolve_profile("하츄핑", None, db)
@@ -230,56 +228,35 @@ def register_tools(mcp: FastMCP) -> None:
                     "하츄핑 프로필을 찾을 수 없습니다. Voicebox 프로필에 '하츄핑'이 등록되어 있는지 확인해주세요."
                 )
 
-            # Auto-format text with ~츄 style if needed
-            formatted_text = text.strip()
-            if not any(formatted_text.endswith(s) for s in ["츄", "츄!", "츄?", "츄~", "츄."]):
-                if formatted_text.endswith((".", "!", "~")):
-                    formatted_text = formatted_text[:-1] + "츄!"
-                elif formatted_text.endswith("?"):
-                    formatted_text = formatted_text[:-1] + "츄?"
-                else:
-                    formatted_text = formatted_text + "츄!"
-
-            effects = [
-                models.EffectConfig(
-                    type="pitch_shift",
-                    enabled=True,
-                    params={"semitones": pitch_shift},
-                )
-            ] if pitch_shift != 0 else None
-
-            instruct = "매우 높고 맑은 초고음 여자 어린이 요정 목소리, 애교 넘치고 상냥하고 밝게 말하기"
-
             return await _speak(
                 profile_id=vp.id,
                 profile_name=vp.name,
-                text=formatted_text,
+                text=text,
                 engine="qwen",
                 language="ko",
-                personality=False,  # Already formatted
-                instruct=instruct,
-                effects_chain=effects,
+                personality=False,
+                instruct=None,
+                effects_chain=None,
                 model_size=None,
                 db=db,
             )
         finally:
             db.close()
 
-    # ── 4. voicebox.hachuping_generate (하츄핑 전용 오디오 생성 및 파일 반환) ──
+    # ── 4. voicebox.hachuping_generate (하츄핑 프로필 웹 UI와 100% 동일 파일 생성) ──
     @mcp.tool(
         name="voicebox.hachuping_generate",
         description=(
-            "Generate authentic 'Hachuping' (하츄핑) audio file and WAIT until complete. "
-            "Returns audio file path and optional base64. Perfect for AI agents."
+            "Generate 'Hachuping' (하츄핑) audio file exactly like web UI and WAIT until complete. "
+            "Returns audio file path and optional base64. 100% identical to web generation."
         ),
     )
     async def voicebox_hachuping_generate(
         text: str,
-        pitch_shift: float = 3.5,
         return_base64: bool = False,
         timeout_seconds: float = 60.0,
     ) -> dict[str, Any]:
-        """Synthesize authentic Hachuping audio and return file path/base64."""
+        """Synthesize Hachuping audio exactly identical to web UI."""
         db = next(get_db())
         try:
             vp = resolve_profile("하츄핑", None, db)
@@ -288,34 +265,15 @@ def register_tools(mcp: FastMCP) -> None:
                     "하츄핑 프로필을 찾을 수 없습니다. Voicebox 프로필에 '하츄핑'이 등록되어 있는지 확인해주세요."
                 )
 
-            formatted_text = text.strip()
-            if not any(formatted_text.endswith(s) for s in ["츄", "츄!", "츄?", "츄~", "츄."]):
-                if formatted_text.endswith((".", "!", "~")):
-                    formatted_text = formatted_text[:-1] + "츄!"
-                elif formatted_text.endswith("?"):
-                    formatted_text = formatted_text[:-1] + "츄?"
-                else:
-                    formatted_text = formatted_text + "츄!"
-
-            effects = [
-                models.EffectConfig(
-                    type="pitch_shift",
-                    enabled=True,
-                    params={"semitones": pitch_shift},
-                )
-            ] if pitch_shift != 0 else None
-
-            instruct = "매우 높고 맑은 초고음 여자 어린이 요정 목소리, 애교 넘치고 상냥하고 밝게 말하기"
-
             speak_res = await _speak(
                 profile_id=vp.id,
                 profile_name=vp.name,
-                text=formatted_text,
+                text=text,
                 engine="qwen",
                 language="ko",
                 personality=False,
-                instruct=instruct,
-                effects_chain=effects,
+                instruct=None,
+                effects_chain=None,
                 model_size=None,
                 db=db,
             )
