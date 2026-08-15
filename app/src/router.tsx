@@ -22,6 +22,7 @@ import { SettingsLayout } from '@/components/ServerTab/ServerTab';
 import { Sidebar } from '@/components/Sidebar';
 import { StoriesTab } from '@/components/StoriesTab/StoriesTab';
 import { Toaster } from '@/components/ui/toaster';
+import { TrimmerTab } from '@/components/TrimmerTab/TrimmerTab';
 import { VoicesTab } from '@/components/VoicesTab/VoicesTab';
 import { useGenerationProgress } from '@/lib/hooks/useGenerationProgress';
 import { useModelDownloadToast } from '@/lib/hooks/useModelDownloadToast';
@@ -199,12 +200,20 @@ const serverRedirectRoute = createRoute({
   },
 });
 
+// Trimmer route
+const trimmerRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/trimmer',
+  component: TrimmerTab,
+});
+
 // Route tree
 const routeTree = rootRoute.addChildren([
   indexRoute,
   storiesRoute,
   capturesRoute,
   voicesRoute,
+  trimmerRoute,
   effectsRoute,
   modelsRoute,
   settingsRoute.addChildren([

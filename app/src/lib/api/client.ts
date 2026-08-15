@@ -425,6 +425,34 @@ class ApiClient {
     return response.json();
   }
 
+  /**
+   * Remove background music / instruments from an audio file using AI vocal isolation (Demucs).
+   * Returns an isolated vocal File in WAV format.
+   */
+  async removeBgm(file: File): Promise<File> {
+    const formData = new FormData();
+    formData.append('file', file);
+
+    const url = `${this.getBaseUrl()}/audio/remove-bgm`;
+    const response = await fetch(url, {
+      method: 'POST',
+      body: formData,
+    });
+
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({
+        detail: response.statusText,
+      }));
+      throw new Error(formatErrorDetail(error.detail, `HTTP error! status: ${response.status}`));
+    }
+
+    const blob = await response.blob();
+    const baseName = file.name.replace(/\.[^/.]+$/, '');
+    const cleanFileName = `${baseName}_vocals.wav`;
+
+    return new File([blob], cleanFileName, { type: 'audio/wav' });
+  }
+
   // Captures
   async listCaptures(limit = 50, offset = 0): Promise<CaptureListResponse> {
     return this.request<CaptureListResponse>(

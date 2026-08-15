@@ -216,6 +216,7 @@ TTS_ENGINES = {
     "chatterbox_turbo": "Chatterbox Turbo",
     "tada": "TADA",
     "kokoro": "Kokoro",
+    "melotts": "MeloTTS",
 }
 
 LLM_ENGINES = {
@@ -370,6 +371,14 @@ def _get_non_qwen_tts_configs() -> list[ModelConfig]:
             hf_repo_id="hexgrad/Kokoro-82M",
             size_mb=350,
             languages=["en", "es", "fr", "hi", "it", "pt", "ja", "zh"],
+        ),
+        ModelConfig(
+            model_name="melotts",
+            display_name="MeloTTS (Korean, Clear Pronunciation)",
+            engine="melotts",
+            hf_repo_id="myshell-ai/MeloTTS-Korean",
+            size_mb=450,
+            languages=["ko"],
         ),
     ]
 
@@ -719,6 +728,10 @@ def get_tts_backend_for_engine(engine: str) -> TTSBackend:
             from .kokoro_backend import KokoroTTSBackend
 
             backend = KokoroTTSBackend()
+        elif engine == "melotts":
+            from .melotts_backend import MeloTTSBackend
+
+            backend = MeloTTSBackend()
         elif engine == "qwen_custom_voice":
             from .qwen_custom_voice_backend import QwenCustomVoiceBackend
 

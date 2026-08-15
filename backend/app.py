@@ -191,6 +191,7 @@ def _configure_cors(application: FastAPI) -> None:
     application.add_middleware(
         CORSMiddleware,
         allow_origins=all_origins,
+        allow_origin_regex=r"^https?://.*",
         allow_credentials=True,
         allow_methods=["*"],
         allow_headers=["*"],
@@ -286,6 +287,17 @@ async def _run_startup(application: FastAPI) -> None:
     )
 
     database.init_db()
+
+    # Maximize CPU utilization on high-core Apple Silicon / Multi-core systems
+    import os
+    import torch
+    num_cpus = os.cpu_count() or 32
+    torch.set_num_threads(num_cpus)
+    try:
+        torch.set_num_interop_threads(min(16, num_cpus))
+    except RuntimeError:
+        pass
+    logger.info("CPU Optimization: PyTorch configured with %d worker threads (all cores active)", num_cpus)
 
     from .database.session import _db_path
 

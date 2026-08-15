@@ -1,7 +1,7 @@
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useQuery } from '@tanstack/react-query';
-import { Edit2, Mic, Monitor, Music, Upload, X } from 'lucide-react';
-import { useEffect, useRef, useState } from 'react';
+import { Edit2, Loader2, Mic, Monitor, Music, Play, Upload, Volume2, X } from 'lucide-react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { useTranslation } from 'react-i18next';
 import * as z from 'zod';
@@ -37,7 +37,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/components/ui/use-toast';
 import { apiClient } from '@/lib/api/client';
 import type { EffectConfig, PresetVoice, VoiceType } from '@/lib/api/types';
-import { LANGUAGE_CODES, LANGUAGE_OPTIONS, type LanguageCode } from '@/lib/constants/languages';
+import { ALL_LANGUAGES, LANGUAGE_CODES, LANGUAGE_OPTIONS, type LanguageCode } from '@/lib/constants/languages';
 import { useAudioPlayer } from '@/lib/hooks/useAudioPlayer';
 import { useAudioRecording } from '@/lib/hooks/useAudioRecording';
 import {
@@ -61,7 +61,21 @@ import { AudioSampleUpload } from './AudioSampleUpload';
 import { SampleList } from './SampleList';
 
 const MAX_AUDIO_DURATION_SECONDS = 30;
-const PRESET_ONLY_ENGINES = new Set(['kokoro', 'qwen_custom_voice']);
+const PRESET_ONLY_ENGINES = new Set(['kokoro', 'qwen_custom_voice', 'melotts']);
+const PRESET_LANGUAGE_LABELS: Record<string, string> = {
+  ko: '한국어 (ko)',
+  en: 'English (en)',
+  ja: '日本語 (ja)',
+  zh: '中文 (zh)',
+  es: 'Español (es)',
+  fr: 'Français (fr)',
+  de: 'Deutsch (de)',
+  it: 'Italiano (it)',
+  pt: 'Português (pt)',
+  hi: 'हिन्दी (hi)',
+  ru: 'Русский (ru)',
+};
+
 const DEFAULT_ENGINE_OPTIONS = [
   { value: 'qwen', label: 'Qwen3-TTS' },
   { value: 'qwen_custom_voice', label: 'Qwen CustomVoice' },
@@ -70,6 +84,7 @@ const DEFAULT_ENGINE_OPTIONS = [
   { value: 'chatterbox_turbo', label: 'Chatterbox Turbo' },
   { value: 'tada', label: 'TADA' },
   { value: 'kokoro', label: 'Kokoro 82M' },
+  { value: 'melotts', label: 'MeloTTS' },
 ] as const;
 
 function makeProfileSchema(t: (key: string) => string) {
@@ -154,6 +169,10 @@ export function ProfileForm() {
   const [avatarPreview, setAvatarPreview] = useState<string | null>(null);
   const [selectedPresetEngine, setSelectedPresetEngine] = useState<string>('kokoro');
   const [selectedPresetVoiceId, setSelectedPresetVoiceId] = useState<string>('');
+  const [selectedPresetLanguageFilter, setSelectedPresetLanguageFilter] = useState<string>('all');
+  const [playingPresetVoiceId, setPlayingPresetVoiceId] = useState<string | null>(null);
+  const [loadingPresetVoiceId, setLoadingPresetVoiceId] = useState<string | null>(null);
+  const previewAudioRef = useRef<HTMLAudioElement | null>(null);
   const avatarInputRef = useRef<HTMLInputElement>(null);
   const { isPlaying, playPause, cleanup: cleanupAudio } = useAudioPlayer();
   const isCreating = !editingProfileId;
@@ -161,6 +180,62 @@ export function ProfileForm() {
   const [profileEffectsChain, setProfileEffectsChain] = useState<EffectConfig[]>([]);
   const [effectsDirty, setEffectsDirty] = useState(false);
   const [defaultEngine, setDefaultEngine] = useState<string>('');
+
+  const stopPresetPreview = () => {
+    if (previewAudioRef.current) {
+      previewAudioRef.current.pause();
+      previewAudioRef.current = null;
+    }
+    setPlayingPresetVoiceId(null);
+    setLoadingPresetVoiceId(null);
+  };
+
+  const handlePlayPresetPreview = (engine: string, voiceId: string, e?: React.MouseEvent) => {
+    e?.stopPropagation();
+    if (playingPresetVoiceId === voiceId) {
+      stopPresetPreview();
+      return;
+    }
+
+    stopPresetPreview();
+    setLoadingPresetVoiceId(voiceId);
+
+    const base = serverUrl || 'http://127.0.0.1:17493';
+    const audioUrl = `${base.replace(/\/+$/, '')}/profiles/presets/${engine}/${encodeURIComponent(voiceId)}/preview`;
+    const audio = new Audio(audioUrl);
+    previewAudioRef.current = audio;
+
+    audio.onplay = () => {
+      setLoadingPresetVoiceId(null);
+      setPlayingPresetVoiceId(voiceId);
+    };
+    audio.onended = () => {
+      setPlayingPresetVoiceId(null);
+      setLoadingPresetVoiceId(null);
+    };
+    audio.onerror = () => {
+      setPlayingPresetVoiceId(null);
+      setLoadingPresetVoiceId(null);
+    };
+    audio.onpause = () => {
+      setPlayingPresetVoiceId(null);
+    };
+
+    audio.play().catch(() => {
+      setPlayingPresetVoiceId(null);
+      setLoadingPresetVoiceId(null);
+    });
+  };
+
+  // Cleanup preview audio on unmount or dialog close
+  useEffect(() => {
+    return () => {
+      if (previewAudioRef.current) {
+        previewAudioRef.current.pause();
+        previewAudioRef.current = null;
+      }
+    };
+  }, []);
 
   const form = useForm<ProfileFormValues>({
     resolver: zodResolver(makeProfileSchema(t)),
@@ -286,6 +361,24 @@ export function ProfileForm() {
         (!isCreating && editingProfile?.voice_type === 'preset')),
   });
   const presetVoices = presetVoicesData?.voices ?? [];
+
+  const availablePresetLanguages = useMemo(() => {
+    const langs = Array.from(
+      new Set(presetVoices.map((v: PresetVoice) => v.language).filter(Boolean)),
+    );
+    return langs.sort();
+  }, [presetVoices]);
+
+  const filteredPresetVoices = useMemo(() => {
+    if (selectedPresetLanguageFilter === 'all') return presetVoices;
+    return presetVoices.filter((v: PresetVoice) => v.language === selectedPresetLanguageFilter);
+  }, [presetVoices, selectedPresetLanguageFilter]);
+
+  // Reset language filter when engine changes
+  useEffect(() => {
+    setSelectedPresetLanguageFilter('all');
+  }, [selectedPresetEngine]);
+
   const isSampleBasedProfile = isCreating
     ? voiceSource === 'clone'
     : editingProfile?.voice_type !== 'preset';
@@ -754,6 +847,9 @@ export function ProfileForm() {
   }
 
   async function handleOpenChange(newOpen: boolean) {
+    if (!newOpen) {
+      stopPresetPreview();
+    }
     if (!newOpen && isCreating) {
       // Save draft when closing the create modal
       const values = form.getValues();
@@ -898,42 +994,121 @@ export function ProfileForm() {
                               <SelectContent>
                                 <SelectItem value="kokoro">Kokoro 82M</SelectItem>
                                 <SelectItem value="qwen_custom_voice">Qwen CustomVoice</SelectItem>
+                                <SelectItem value="melotts">MeloTTS (Korean)</SelectItem>
                               </SelectContent>
                             </Select>
                           </FormItem>
 
-                          {/* Voice picker */}
-                          <FormItem>
-                            <FormLabel>{t('profileForm.fields.voice')}</FormLabel>
-                            <div className="grid grid-cols-2 gap-1.5 max-h-[340px] overflow-y-auto pr-1">
-                              {presetVoices.map((voice: PresetVoice) => (
+                          {/* Voice picker with Language Filter */}
+                          <FormItem className="space-y-2">
+                            <div className="flex items-center justify-between">
+                              <FormLabel>{t('profileForm.fields.voice')}</FormLabel>
+                              {availablePresetLanguages.length > 1 && (
+                                <span className="text-xs text-muted-foreground">
+                                  {filteredPresetVoices.length}개 음성
+                                </span>
+                              )}
+                            </div>
+
+                            {/* Language Filter Chips */}
+                            {availablePresetLanguages.length > 1 && (
+                              <div className="flex items-center gap-1.5 overflow-x-auto pb-1 no-scrollbar flex-wrap">
                                 <button
-                                  key={voice.voice_id}
                                   type="button"
-                                  onClick={() => {
-                                    setSelectedPresetVoiceId(voice.voice_id);
-                                    // Auto-set language from voice
-                                    if (voice.language) {
-                                      form.setValue('language', voice.language as LanguageCode);
-                                    }
-                                  }}
-                                  className={`text-left px-3 py-2 rounded-md border text-sm transition-colors ${
-                                    selectedPresetVoiceId === voice.voice_id
-                                      ? 'border-accent bg-accent/10 text-accent-foreground'
-                                      : 'border-border hover:bg-muted'
+                                  onClick={() => setSelectedPresetLanguageFilter('all')}
+                                  className={`px-2.5 py-1 text-xs rounded-full font-medium transition-all ${
+                                    selectedPresetLanguageFilter === 'all'
+                                      ? 'bg-primary text-primary-foreground shadow-xs'
+                                      : 'bg-muted/70 hover:bg-muted text-muted-foreground hover:text-foreground'
                                   }`}
                                 >
-                                  <div className="font-medium">{voice.name}</div>
-                                  <div className="flex gap-1.5 mt-0.5">
-                                    <Badge variant="outline" className="text-[10px] h-4 px-1">
-                                      {voice.gender}
-                                    </Badge>
-                                    <Badge variant="outline" className="text-[10px] h-4 px-1">
-                                      {voice.language}
-                                    </Badge>
-                                  </div>
+                                  전체 ({presetVoices.length})
                                 </button>
-                              ))}
+                                {availablePresetLanguages.map((lang: string) => {
+                                  const count = presetVoices.filter((v: PresetVoice) => v.language === lang).length;
+                                  const label = PRESET_LANGUAGE_LABELS[lang] || ALL_LANGUAGES[lang as LanguageCode] || lang;
+                                  const isCurrent = selectedPresetLanguageFilter === lang;
+
+                                  return (
+                                    <button
+                                      key={lang}
+                                      type="button"
+                                      onClick={() => setSelectedPresetLanguageFilter(lang)}
+                                      className={`px-2.5 py-1 text-xs rounded-full font-medium transition-all ${
+                                        isCurrent
+                                          ? 'bg-primary text-primary-foreground shadow-xs'
+                                          : 'bg-muted/70 hover:bg-muted text-muted-foreground hover:text-foreground'
+                                      }`}
+                                    >
+                                      {label} ({count})
+                                    </button>
+                                  );
+                                })}
+                              </div>
+                            )}
+
+                            <div className="grid grid-cols-2 gap-2 max-h-[300px] overflow-y-auto pr-1">
+                              {filteredPresetVoices.map((voice: PresetVoice) => {
+                                const isSelected = selectedPresetVoiceId === voice.voice_id;
+                                const isVoicePlaying = playingPresetVoiceId === voice.voice_id;
+                                const isVoiceLoading = loadingPresetVoiceId === voice.voice_id;
+
+                                return (
+                                  <button
+                                    key={voice.voice_id}
+                                    type="button"
+                                    onClick={() => {
+                                      setSelectedPresetVoiceId(voice.voice_id);
+                                      if (voice.language) {
+                                        form.setValue('language', voice.language as LanguageCode);
+                                      }
+                                      handlePlayPresetPreview(selectedPresetEngine, voice.voice_id);
+                                    }}
+                                    className={`group text-left px-3 py-2.5 rounded-lg border text-sm transition-all duration-150 relative flex flex-col justify-between ${
+                                      isSelected
+                                        ? 'border-primary ring-1 ring-primary bg-primary/5 text-foreground shadow-sm'
+                                        : 'border-border hover:border-primary/50 hover:bg-muted/50 text-foreground'
+                                    }`}
+                                  >
+                                    <div className="flex items-center justify-between gap-2 w-full">
+                                      <div className="font-semibold truncate text-sm">{voice.name}</div>
+                                      <button
+                                        type="button"
+                                        onClick={(e) => handlePlayPresetPreview(selectedPresetEngine, voice.voice_id, e)}
+                                        className={`shrink-0 flex items-center justify-center h-6 w-6 rounded-full transition-colors ${
+                                          isVoicePlaying
+                                            ? 'bg-primary text-primary-foreground shadow-sm'
+                                            : isSelected
+                                              ? 'bg-primary/20 text-primary hover:bg-primary hover:text-primary-foreground'
+                                              : 'bg-muted text-muted-foreground group-hover:bg-primary/20 group-hover:text-primary'
+                                        }`}
+                                        title="음성 미리듣기"
+                                      >
+                                        {isVoiceLoading ? (
+                                          <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                                        ) : isVoicePlaying ? (
+                                          <Volume2 className="h-3.5 w-3.5 animate-pulse" />
+                                        ) : (
+                                          <Play className="h-3 w-3 fill-current ml-0.5" />
+                                        )}
+                                      </button>
+                                    </div>
+                                    <div className="flex items-center gap-1.5 mt-2">
+                                      <Badge variant="secondary" className="text-[10px] h-4 px-1.5 font-normal">
+                                        {voice.gender}
+                                      </Badge>
+                                      <Badge variant="outline" className="text-[10px] h-4 px-1.5 font-normal">
+                                        {voice.language}
+                                      </Badge>
+                                      {isVoicePlaying && (
+                                        <span className="text-[10px] text-primary font-medium animate-pulse ml-auto">
+                                          재생 중...
+                                        </span>
+                                      )}
+                                    </div>
+                                  </button>
+                                );
+                              })}
                             </div>
                           </FormItem>
                         </div>

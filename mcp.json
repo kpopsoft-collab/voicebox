@@ -1,0 +1,16 @@
+{
+  "mcpServers": {
+    "voicebox": {
+      "url": "https://192.168.0.200:17493/mcp",
+      "headers": {
+        "x-client-id": "ai-assistant"
+      }
+    },
+    "voicebox-local": {
+      "url": "https://127.0.0.1:17493/mcp",
+      "headers": {
+        "x-client-id": "local-ai"
+      }
+    }
+  }
+}

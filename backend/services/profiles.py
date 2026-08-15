@@ -24,7 +24,7 @@ from ..utils.images import process_avatar, validate_image
 
 logger = logging.getLogger(__name__)
 
-CLONING_ENGINES = {"qwen", "luxtts", "chatterbox", "chatterbox_turbo", "tada"}
+CLONING_ENGINES = {"qwen", "luxtts", "chatterbox", "chatterbox_turbo", "tada", "melotts"}
 
 
 def _profile_to_response(
@@ -72,6 +72,9 @@ def _get_preset_voice_ids(engine: str) -> set[str]:
         from ..backends.qwen_custom_voice_backend import QWEN_CUSTOM_VOICES
 
         return {voice_id for voice_id, _name, _gender, _lang, _desc in QWEN_CUSTOM_VOICES}
+
+    if engine == "melotts":
+        return {"KR"}
 
     return set()
 

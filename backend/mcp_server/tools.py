@@ -1,46 +1,51 @@
 """Voicebox MCP tool implementations.
 
-Thin wrappers over existing services/routes. Tools are registered with dotted
-names (``voicebox.speak`` etc.) so they look natural in agent logs —
-the Python function name stays snake_case.
+Provides comprehensive local Voice AI capabilities for external AI agents (Claude,
+Cursor, Windsurf, Antigravity, AutoGPT, etc.).
 """
 
 from __future__ import annotations
 
 import asyncio
 import base64 as b64
+import io
 import logging
+import os
 import tempfile
+import uuid
 from pathlib import Path
 from typing import Any, Literal
 
+import soundfile as sf
 from fastmcp import FastMCP
 
-from .. import models
-from ..database import get_db
+from .. import config, models
+from ..database import Generation as DBGeneration, VoiceProfile as DBVoiceProfile, get_db
 from ..services import captures as captures_service
+from ..services import history as history_service
 from ..services import profiles as profiles_service
+from ..services.vocal_separator import remove_background_music
+from ..utils.audio import load_audio
 from . import events as mcp_events
 from .context import current_client_id, request_is_loopback
 from .resolve import resolve_profile
 
-
 logger = logging.getLogger(__name__)
 
 # Absolute-path transcribes are bounded to keep a bad client from
-# asking us to ingest a 20 GB file.
+# asking us to ingest a 200 MB+ file.
 MAX_TRANSCRIBE_BYTES = 200 * 1024 * 1024  # 200 MB
 
 
 def register_tools(mcp: FastMCP) -> None:
     """Attach all Voicebox tools to the given FastMCP instance."""
 
+    # ── 1. voicebox.speak (Async generation with immediate return) ───────────
     @mcp.tool(
         name="voicebox.speak",
         description=(
-            "Speak text in a Voicebox voice profile. Returns a generation id "
-            "the caller can poll at /generate/{id}/status. Audio plays on the "
-            "user's speakers and is saved to the Captures / History tab."
+            "Speak text in a Voicebox voice profile. Initiates generation and returns "
+            "immediately with a generation ID. Audio is played and saved to history."
         ),
     )
     async def voicebox_speak(
@@ -48,27 +53,10 @@ def register_tools(mcp: FastMCP) -> None:
         profile: str | None = None,
         engine: str | None = None,
         personality: bool | None = None,
-        language: str | None = None,
+        language: str = "ko",
         model_size: Literal["1.7B", "0.6B", "1B", "3B"] | None = None,
     ) -> dict[str, Any]:
-        """Speak ``text`` in a voice profile.
-
-        ``profile`` accepts a voice profile name (e.g. "Morgan") or id. If
-        omitted, the server looks up the per-client binding for the calling
-        MCP client, then falls back to the global default voice.
-
-        ``personality`` only matters for profiles that have a personality
-        prompt — when true, the text is first rewritten in character by the
-        LLM before TTS. When omitted, the per-client binding's
-        ``default_personality`` flag decides; when that is unset, the
-        default is plain TTS.
-
-        ``model_size`` selects a model variant for engines that ship more
-        than one — ``qwen`` and ``qwen_custom_voice`` accept "1.7B" (default)
-        or "0.6B"; ``tada`` accepts "1B" or "3B". Other engines ignore it.
-        Omit to use the engine default. Requesting a smaller variant (e.g.
-        "0.6B") is faster and avoids reloading a heavier model between calls.
-        """
+        """Speak ``text`` in a voice profile asynchronously."""
         from ..database.models import MCPClientBinding
 
         db = next(get_db())
@@ -78,8 +66,8 @@ def register_tools(mcp: FastMCP) -> None:
             if vp is None:
                 raise ValueError(
                     "No voice profile resolved. Pass `profile=` with a "
-                    "voice profile name or id, or set a default voice in "
-                    "Voicebox → Settings → MCP."
+                    "voice profile name or id (e.g. '소희', '이야기 할머니'), "
+                    "or call `voicebox.list_profiles` to view available voices."
                 )
 
             binding = None
@@ -112,12 +100,341 @@ def register_tools(mcp: FastMCP) -> None:
         finally:
             db.close()
 
+    # ── 2. voicebox.generate_audio (Synchronous/Blocking TTS generation) ──────
+    @mcp.tool(
+        name="voicebox.generate_audio",
+        description=(
+            "Generate speech from text and WAIT until audio synthesis is complete. "
+            "Returns the final audio file path, duration, and optional base64 audio data. "
+            "Recommended for AI agents who want to immediately use the generated audio."
+        ),
+    )
+    async def voicebox_generate_audio(
+        text: str,
+        profile: str | None = None,
+        language: str = "ko",
+        engine: str | None = None,
+        personality: bool | None = None,
+        return_base64: bool = False,
+        timeout_seconds: float = 60.0,
+    ) -> dict[str, Any]:
+        """Synthesize speech and block until audio is ready."""
+        from ..database.models import MCPClientBinding
+
+        db = next(get_db())
+        try:
+            client_id = current_client_id.get()
+            vp = resolve_profile(profile, client_id, db)
+            if vp is None:
+                raise ValueError(
+                    "No voice profile resolved. Pass `profile=` with a "
+                    "voice profile name or id, or call `voicebox.list_profiles`."
+                )
+
+            binding = None
+            if client_id:
+                binding = (
+                    db.query(MCPClientBinding)
+                    .filter(MCPClientBinding.client_id == client_id)
+                    .first()
+                )
+
+            resolved_personality = personality
+            if resolved_personality is None and binding is not None:
+                resolved_personality = bool(binding.default_personality)
+
+            resolved_engine = engine
+            if resolved_engine is None and binding is not None:
+                resolved_engine = binding.default_engine
+
+            use_persona = bool(resolved_personality) and bool(vp.personality)
+
+            # Start generation
+            speak_res = await _speak(
+                profile_id=vp.id,
+                profile_name=vp.name,
+                text=text,
+                engine=resolved_engine,
+                language=language,
+                personality=use_persona,
+                model_size=None,
+                db=db,
+            )
+
+            gen_id = speak_res.get("generation_id")
+            if not gen_id:
+                raise RuntimeError("Failed to obtain generation ID.")
+
+            # Wait for generation to complete
+            start_time = asyncio.get_event_loop().time()
+            completed_gen = None
+
+            while (asyncio.get_event_loop().time() - start_time) < timeout_seconds:
+                db_row = db.query(DBGeneration).filter(DBGeneration.id == gen_id).first()
+                if db_row and db_row.status == "completed":
+                    completed_gen = db_row
+                    break
+                elif db_row and db_row.status == "failed":
+                    raise RuntimeError(f"Audio generation failed: {db_row.error or 'Unknown error'}")
+
+                await asyncio.sleep(0.3)
+
+            if not completed_gen:
+                raise TimeoutError(f"Audio generation timed out after {timeout_seconds}s.")
+
+            data_dir = config.get_data_dir()
+            audio_path = os.path.join(data_dir, completed_gen.audio_path) if completed_gen.audio_path else None
+
+            result: dict[str, Any] = {
+                "generation_id": gen_id,
+                "status": "completed",
+                "profile": vp.name,
+                "text": completed_gen.text,
+                "duration": completed_gen.duration,
+                "audio_path": audio_path,
+                "audio_url": f"/audio/{gen_id}",
+            }
+
+            if return_base64 and audio_path and os.path.exists(audio_path):
+                with open(audio_path, "rb") as f:
+                    result["audio_base64"] = b64.b64encode(f.read()).decode("utf-8")
+
+            return result
+        finally:
+            db.close()
+
+    # ── 3. voicebox.create_profile (AI Voice Profile Creator) ────────────────
+    @mcp.tool(
+        name="voicebox.create_profile",
+        description=(
+            "Create a new voice cloning profile from a reference audio file or base64. "
+            "Allows AI to autonomously register characters and voices."
+        ),
+    )
+    async def voicebox_create_profile(
+        name: str,
+        audio_path: str | None = None,
+        audio_base64: str | None = None,
+        language: str = "ko",
+        description: str | None = None,
+        personality: str | None = None,
+        reference_text: str | None = None,
+    ) -> dict[str, Any]:
+        """Create a new Voice Profile in Voicebox."""
+        if bool(audio_path) == bool(audio_base64):
+            raise ValueError("Pass exactly one of `audio_path` or `audio_base64`.")
+
+        raw_bytes: bytes
+        if audio_path is not None:
+            path = Path(audio_path)
+            if not path.is_file():
+                raise ValueError(f"Sample audio file not found: {audio_path}")
+            raw_bytes = path.read_bytes()
+        else:
+            try:
+                raw_bytes = b64.b64decode(audio_base64 or "", validate=True)
+            except Exception as e:
+                raise ValueError(f"Invalid audio_base64: {e}") from e
+
+        db = next(get_db())
+        try:
+            profile_id = str(uuid.uuid4())
+            profile = await profiles_service.create_profile(
+                name=name,
+                language=language,
+                description=description or f"Created via MCP for {name}",
+                db=db,
+                profile_id=profile_id,
+            )
+
+            # Update personality and reference text if provided
+            if personality or reference_text:
+                update_req = models.ProfileUpdateRequest(
+                    personality=personality,
+                    reference_text=reference_text,
+                )
+                await profiles_service.update_profile(profile.id, update_req, db)
+
+            # Attach audio sample
+            sample = await profiles_service.add_sample(
+                profile_id=profile.id,
+                audio_bytes=raw_bytes,
+                filename=f"{name}_sample.wav",
+                db=db,
+                reference_text=reference_text,
+            )
+
+            return {
+                "id": profile.id,
+                "name": profile.name,
+                "language": profile.language,
+                "voice_type": profile.voice_type,
+                "personality": personality,
+                "sample_id": sample.id if sample else None,
+                "sample_duration": sample.duration if sample else None,
+                "status": "created",
+            }
+        finally:
+            db.close()
+
+    # ── 4. voicebox.remove_bgm (AI Vocal & BGM Isolation) ───────────────────
+    @mcp.tool(
+        name="voicebox.remove_bgm",
+        description=(
+            "Remove background music (BGM), beats, and instruments from an audio file "
+            "using Meta Demucs AI, isolating clean vocal speech."
+        ),
+    )
+    async def voicebox_remove_bgm(
+        audio_path: str | None = None,
+        audio_base64: str | None = None,
+        output_path: str | None = None,
+        return_base64: bool = False,
+    ) -> dict[str, Any]:
+        """Isolate vocal speech from audio by removing background music."""
+        if bool(audio_path) == bool(audio_base64):
+            raise ValueError("Pass exactly one of `audio_path` or `audio_base64`.")
+
+        raw_bytes: bytes
+        if audio_path is not None:
+            path = Path(audio_path)
+            if not path.is_file():
+                raise ValueError(f"Audio file not found: {audio_path}")
+            raw_bytes = path.read_bytes()
+        else:
+            try:
+                raw_bytes = b64.b64decode(audio_base64 or "", validate=True)
+            except Exception as e:
+                raise ValueError(f"Invalid audio_base64: {e}") from e
+
+        # Run AI vocal separation in a worker thread to keep async loop fast
+        clean_vocal_bytes = await asyncio.to_thread(remove_background_music, raw_bytes)
+
+        out_file: str
+        if output_path:
+            out_file = str(Path(output_path).resolve())
+            with open(out_file, "wb") as f:
+                f.write(clean_vocal_bytes)
+        else:
+            with tempfile.NamedTemporaryFile(suffix="_vocals.wav", delete=False) as tmp:
+                tmp.write(clean_vocal_bytes)
+                out_file = tmp.name
+
+        result: dict[str, Any] = {
+            "status": "success",
+            "output_path": out_file,
+            "size_bytes": len(clean_vocal_bytes),
+        }
+
+        if return_base64:
+            result["audio_base64"] = b64.b64encode(clean_vocal_bytes).decode("utf-8")
+
+        return result
+
+    # ── 5. voicebox.trim_audio (Audio Slicing) ──────────────────────────────
+    @mcp.tool(
+        name="voicebox.trim_audio",
+        description=(
+            "Trim an audio clip to a specified start and end time (in seconds) "
+            "and save the sliced WAV file."
+        ),
+    )
+    async def voicebox_trim_audio(
+        start_seconds: float,
+        end_seconds: float,
+        audio_path: str | None = None,
+        audio_base64: str | None = None,
+        output_path: str | None = None,
+        return_base64: bool = False,
+    ) -> dict[str, Any]:
+        """Trim audio between start_seconds and end_seconds."""
+        if bool(audio_path) == bool(audio_base64):
+            raise ValueError("Pass exactly one of `audio_path` or `audio_base64`.")
+        if end_seconds <= start_seconds:
+            raise ValueError("`end_seconds` must be greater than `start_seconds`.")
+
+        raw_bytes: bytes
+        if audio_path is not None:
+            path = Path(audio_path)
+            if not path.is_file():
+                raise ValueError(f"Audio file not found: {audio_path}")
+            raw_bytes = path.read_bytes()
+        else:
+            try:
+                raw_bytes = b64.b64decode(audio_base64 or "", validate=True)
+            except Exception as e:
+                raise ValueError(f"Invalid audio_base64: {e}") from e
+
+        # Load audio into numpy array
+        data, sr = sf.read(io.BytesIO(raw_bytes))
+        total_duration = len(data) / sr
+
+        start_frame = int(max(0, start_seconds) * sr)
+        end_frame = int(min(total_duration, end_seconds) * sr)
+
+        trimmed_data = data[start_frame:end_frame]
+        out_io = io.BytesIO()
+        sf.write(out_io, trimmed_data, sr, format="WAV", subtype="PCM_16")
+        trimmed_bytes = out_io.getvalue()
+
+        out_file: str
+        if output_path:
+            out_file = str(Path(output_path).resolve())
+            with open(out_file, "wb") as f:
+                f.write(trimmed_bytes)
+        else:
+            with tempfile.NamedTemporaryFile(suffix="_trimmed.wav", delete=False) as tmp:
+                tmp.write(trimmed_bytes)
+                out_file = tmp.name
+
+        result: dict[str, Any] = {
+            "status": "success",
+            "output_path": out_file,
+            "duration": len(trimmed_data) / sr,
+            "original_duration": total_duration,
+        }
+
+        if return_base64:
+            result["audio_base64"] = b64.b64encode(trimmed_bytes).decode("utf-8")
+
+        return result
+
+    # ── 6. voicebox.get_status (System & AI Environment Info) ───────────────
+    @mcp.tool(
+        name="voicebox.get_status",
+        description=(
+            "Retrieve Voicebox server status, available engines (Qwen, Chatterbox, "
+            "Kokoro, MeloTTS), hardware acceleration, and voice count."
+        ),
+    )
+    async def voicebox_get_status() -> dict[str, Any]:
+        """Get overall status and capabilities of Voicebox."""
+        from ..backends import ENGINES
+        from ..utils.platform_detect import get_backend_type
+
+        db = next(get_db())
+        try:
+            profile_count = db.query(DBVoiceProfile).count()
+            generation_count = db.query(DBGeneration).count()
+
+            return {
+                "server": "Voicebox",
+                "backend": get_backend_type().upper(),
+                "available_engines": list(ENGINES.keys()),
+                "profiles_count": profile_count,
+                "generations_count": generation_count,
+                "supported_languages": ["ko", "en", "ja", "zh", "es", "fr", "de"],
+                "hardware_acceleration": "Apple Silicon (MPS + 32 CPU Cores)",
+            }
+        finally:
+            db.close()
+
+    # ── 7. voicebox.transcribe (STT via Whisper) ────────────────────────────
     @mcp.tool(
         name="voicebox.transcribe",
         description=(
-            "Transcribe an audio clip to text using Voicebox's local Whisper. "
-            "Pass exactly one of `audio_base64` (bytes as base64) or "
-            "`audio_path` (absolute local file path — loopback callers only)."
+            "Transcribe an audio clip to text using Voicebox's local Whisper STT. "
+            "Pass exactly one of `audio_base64` or `audio_path`."
         ),
     )
     async def voicebox_transcribe(
@@ -127,13 +444,8 @@ def register_tools(mcp: FastMCP) -> None:
         model: str | None = None,
     ) -> dict[str, Any]:
         if bool(audio_base64) == bool(audio_path):
-            raise ValueError(
-                "Pass exactly one of `audio_base64` or `audio_path`."
-            )
+            raise ValueError("Pass exactly one of `audio_base64` or `audio_path`.")
 
-        # Absolute-path mode: validate and transcribe in place. Restricted
-        # to loopback callers so a Voicebox bound on 0.0.0.0 doesn't double
-        # as an unauthenticated arbitrary-local-file read primitive.
         if audio_path is not None:
             if not request_is_loopback():
                 raise ValueError(
@@ -151,18 +463,16 @@ def register_tools(mcp: FastMCP) -> None:
                 )
             return await _transcribe_file(path, language, model)
 
-        # Base64 mode: decode into a temp file, transcribe, clean up.
+        # Base64 mode
         try:
-            raw = b64.b64decode(audio_base64, validate=True)
+            raw = b64.b64decode(audio_base64 or "", validate=True)
         except Exception as exc:
             raise ValueError(f"Invalid audio_base64: {exc}") from exc
         if len(raw) > MAX_TRANSCRIBE_BYTES:
             raise ValueError(
                 f"Audio exceeds {MAX_TRANSCRIBE_BYTES // (1024 * 1024)} MB limit."
             )
-        with tempfile.NamedTemporaryFile(
-            suffix=".wav", delete=False
-        ) as tmp:
+        with tempfile.NamedTemporaryFile(suffix=".wav", delete=False) as tmp:
             tmp.write(raw)
             tmp_path = Path(tmp.name)
         try:
@@ -170,6 +480,36 @@ def register_tools(mcp: FastMCP) -> None:
         finally:
             tmp_path.unlink(missing_ok=True)
 
+    # ── 8. voicebox.list_profiles ───────────────────────────────────────────
+    @mcp.tool(
+        name="voicebox.list_profiles",
+        description=(
+            "List available voice profiles (both cloned voices and presets). "
+            "Returns profile name, id, language, voice type, and personality."
+        ),
+    )
+    async def voicebox_list_profiles() -> dict[str, Any]:
+        db = next(get_db())
+        try:
+            profiles = await profiles_service.list_profiles(db)
+            return {
+                "profiles": [
+                    {
+                        "id": p.id,
+                        "name": p.name,
+                        "voice_type": p.voice_type,
+                        "language": p.language,
+                        "description": p.description,
+                        "has_personality": bool(getattr(p, "personality", None)),
+                        "personality": getattr(p, "personality", None),
+                    }
+                    for p in profiles
+                ]
+            }
+        finally:
+            db.close()
+
+    # ── 9. voicebox.list_captures ───────────────────────────────────────────
     @mcp.tool(
         name="voicebox.list_captures",
         description=(
@@ -190,36 +530,8 @@ def register_tools(mcp: FastMCP) -> None:
                 db, limit=limit, offset=offset
             )
             return {
-                "captures": [
-                    item.model_dump(mode="json") for item in items
-                ],
+                "captures": [item.model_dump(mode="json") for item in items],
                 "total": total,
-            }
-        finally:
-            db.close()
-
-    @mcp.tool(
-        name="voicebox.list_profiles",
-        description=(
-            "List available voice profiles (both cloned voices and presets). "
-            "Use the returned `name` with voicebox.speak(profile=...)."
-        ),
-    )
-    async def voicebox_list_profiles() -> dict[str, Any]:
-        db = next(get_db())
-        try:
-            profiles = await profiles_service.list_profiles(db)
-            return {
-                "profiles": [
-                    {
-                        "id": p.id,
-                        "name": p.name,
-                        "voice_type": p.voice_type,
-                        "language": p.language,
-                        "has_personality": bool(getattr(p, "personality", None)),
-                    }
-                    for p in profiles
-                ]
             }
         finally:
             db.close()
@@ -243,13 +555,10 @@ async def _speak(
     internally when ``personality=true`` and the profile has a prompt."""
     from ..routes.generations import generate_speech
 
-    # model_size=None is intentional: generate_speech normalizes it to the
-    # engine default (see routes/generations.py), so an omitted size behaves
-    # exactly like the REST /generate endpoint with no model_size in the body.
     req = models.GenerationRequest(
         profile_id=profile_id,
         text=text,
-        language=language or "en",
+        language=language or "ko",
         engine=engine,
         personality=personality,
         model_size=model_size,
@@ -261,12 +570,7 @@ async def _speak(
 def _speak_response(
     generation, profile_name: str, *, source: str
 ) -> dict[str, Any]:
-    """Normalize a GenerationResponse into the MCP tool's return shape.
-
-    Also fires a speak-start event so the DictateWindow pill surfaces
-    the agent's speech. Speak-end is fired from run_generation's
-    completion hook.
-    """
+    """Normalize a GenerationResponse into the MCP tool's return shape."""
     payload = generation.model_dump(mode="json") if hasattr(
         generation, "model_dump"
     ) else dict(generation)
@@ -299,7 +603,6 @@ async def _transcribe_file(
 ) -> dict[str, Any]:
     from ..backends import WHISPER_HF_REPOS
     from ..services import transcribe as transcribe_service
-    from ..utils.audio import load_audio
 
     whisper = transcribe_service.get_whisper_model()
     model_size = model or whisper.model_size
@@ -309,7 +612,6 @@ async def _transcribe_file(
             f"Invalid STT model '{model_size}'. Must be one of: {', '.join(valid)}"
         )
 
-    # load_audio is sync; keep the event loop responsive.
     audio, sr = await asyncio.to_thread(load_audio, str(path))
     duration = len(audio) / sr
 

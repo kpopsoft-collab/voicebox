@@ -30,17 +30,20 @@ function invalidateAllServerData() {
 export function getDefaultServerUrl(): string {
   const fallback = 'http://127.0.0.1:17493';
 
-  if (!import.meta.env.PROD || typeof window === 'undefined') {
+  if (typeof window === 'undefined') {
     return fallback;
   }
 
   const { protocol, origin, hostname } = window.location;
   if (
     (protocol === 'http:' || protocol === 'https:') &&
-    origin &&
+    hostname &&
     hostname !== 'tauri.localhost'
   ) {
-    return origin;
+    if (import.meta.env.PROD && origin) {
+      return origin;
+    }
+    return `${protocol}//${hostname}:17493`;
   }
 
   return fallback;
@@ -87,6 +90,20 @@ export const useServerStore = create<ServerStore>()(
     }),
     {
       name: 'voicebox-server',
+      onRehydrateStorage: () => (state) => {
+        if (typeof window !== 'undefined' && state) {
+          const { hostname, protocol } = window.location;
+          if (
+            hostname &&
+            hostname !== 'localhost' &&
+            hostname !== '127.0.0.1' &&
+            hostname !== 'tauri.localhost' &&
+            isLoopbackVoiceboxServerUrl(state.serverUrl)
+          ) {
+            state.setServerUrl(`${protocol}//${hostname}:17493`);
+          }
+        }
+      },
     },
   ),
 );

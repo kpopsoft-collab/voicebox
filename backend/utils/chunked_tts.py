@@ -312,36 +312,39 @@ async def generate_chunked(
         # Short text — single-shot fast path
         return await generate_one(text, seed)
 
-    # Long text — chunked generation
+    # Long text — chunked generation (concurrently processed on high-core CPUs)
     logger.info(
-        "Splitting %d chars into %d chunks (max %d chars each)",
+        "Splitting %d chars into %d chunks (max %d chars each) with concurrent processing",
         len(text),
         len(chunks),
         max_chunk_chars,
     )
-    audio_chunks: List[np.ndarray] = []
-    sample_rate: int | None = None
 
-    for i, chunk_text in enumerate(chunks):
-        logger.info(
-            "Generating chunk %d/%d (%d chars)",
-            i + 1,
-            len(chunks),
-            len(chunk_text),
-        )
-        # Vary the seed per chunk to avoid correlated RNG artefacts,
-        # but keep it deterministic so the same (text, seed) pair
-        # always produces the same output.
-        chunk_seed = (seed + i) if seed is not None else None
+    import asyncio
+    import os
 
-        chunk_audio, chunk_sr = await generate_one(
-            chunk_text,
-            chunk_seed,
-        )
+    # Determine concurrency based on available CPU cores (up to 4 concurrent chunks)
+    max_workers = min(4, max(1, (os.cpu_count() or 4) // 4))
+    semaphore = asyncio.Semaphore(max_workers)
 
-        audio_chunks.append(chunk_audio)
-        if sample_rate is None:
-            sample_rate = chunk_sr
+    async def _worker(idx: int, chunk_text: str) -> tuple[int, np.ndarray, int]:
+        async with semaphore:
+            logger.info(
+                "Generating chunk %d/%d (%d chars)",
+                idx + 1,
+                len(chunks),
+                len(chunk_text),
+            )
+            chunk_seed = (seed + idx) if seed is not None else None
+            chunk_audio, chunk_sr = await generate_one(chunk_text, chunk_seed)
+            return idx, chunk_audio, chunk_sr
+
+    tasks = [_worker(i, chunk_text) for i, chunk_text in enumerate(chunks)]
+    results = await asyncio.gather(*tasks)
+    results.sort(key=lambda x: x[0])
+
+    audio_chunks = [r[1] for r in results]
+    sample_rate = results[0][2] if results else 24000
 
     audio = concatenate_audio_chunks(audio_chunks, sample_rate, crossfade_ms=crossfade_ms)
     return audio, sample_rate

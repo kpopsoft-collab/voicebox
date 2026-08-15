@@ -104,7 +104,117 @@ async def list_preset_voices(engine: str):
                 for speaker_id, display_name, gender, lang, _desc in QWEN_CUSTOM_VOICES
             ],
         }
+    if engine == "melotts":
+        return {
+            "engine": engine,
+            "voices": [
+                {
+                    "voice_id": "KR",
+                    "name": "민지 (Korean Female)",
+                    "gender": "female",
+                    "language": "ko",
+                }
+            ],
+        }
     return {"engine": engine, "voices": []}
+
+
+@router.get("/profiles/presets/{engine}/{voice_id}/preview")
+async def get_preset_voice_preview(engine: str, voice_id: str):
+    """Generate and return a short preview audio clip for a preset voice."""
+    from ..backends import get_tts_backend_for_engine
+    from ..utils.audio import save_audio
+    from .. import config
+
+    cache_dir = config.get_data_dir() / "cache" / "preset_previews"
+    cache_dir.mkdir(parents=True, exist_ok=True)
+    cache_file = cache_dir / f"{engine}_{voice_id}.wav"
+
+    if cache_file.exists() and cache_file.stat().st_size > 0:
+        return FileResponse(str(cache_file), media_type="audio/wav")
+
+    preview_text = "Hello! This is a preview of this voice."
+    language = "en"
+
+    if engine == "kokoro":
+        prefix = voice_id[:2].lower() if len(voice_id) >= 2 else ""
+        if prefix.startswith("j"):
+            preview_text = "こんにちは！これはサンプルの音声です。"
+            language = "ja"
+        elif prefix.startswith("z"):
+            preview_text = "你好！这是该声音的预览。"
+            language = "zh"
+        elif prefix.startswith("e"):
+            preview_text = "¡Hola! Esta es una vista previa de esta voz."
+            language = "es"
+        elif prefix.startswith("f"):
+            preview_text = "Bonjour! Ceci est un aperçu de cette voix."
+            language = "fr"
+        elif prefix.startswith("h"):
+            preview_text = "नमस्ते! यह इस आवाज़ का नमूना है।"
+            language = "hi"
+        elif prefix.startswith("i"):
+            preview_text = "Ciao! Questa è un'anteprima di questa voce."
+            language = "it"
+        elif prefix.startswith("p"):
+            preview_text = "Olá! Esta é uma prévia desta voz."
+            language = "pt"
+        else:
+            preview_text = "Hello! This is a preview of this voice."
+            language = "en"
+
+    elif engine == "qwen_custom_voice":
+        from ..backends.qwen_custom_voice_backend import QWEN_CUSTOM_VOICES
+
+        voice_entry = next((v for v in QWEN_CUSTOM_VOICES if v[0] == voice_id), None)
+        if voice_entry:
+            lang = voice_entry[3]
+            language = lang
+            if lang == "ko":
+                preview_text = "안녕하세요! 반갑습니다. 만나서 반가워요."
+            elif lang == "ja":
+                preview_text = "こんにちは！これはサンプルの音声です。"
+            elif lang == "zh":
+                preview_text = "你好！这是该声音的预览。"
+            elif lang == "de":
+                preview_text = "Hallo! Dies ist eine Vorschau dieser Stimme."
+            elif lang == "fr":
+                preview_text = "Bonjour! Ceci est un aperçu de cette voix."
+            elif lang == "es":
+                preview_text = "¡Hola! Esta es una vista previa de esta voz."
+            elif lang == "it":
+                preview_text = "Ciao! Questa è un'anteprima di questa voce."
+            elif lang == "pt":
+                preview_text = "Olá! Esta é uma prévia desta voz."
+            elif lang == "ru":
+                preview_text = "Здравствуйте! Это предварительный просмотр голоса."
+            else:
+                preview_text = "Hello! This is a preview of this voice."
+        else:
+            preview_text = "Hello! This is a preview of this voice."
+
+    elif engine == "melotts":
+        language = "ko"
+        preview_text = "안녕하세요! MeloTTS 한국어 미리듣기 음성입니다."
+
+    backend = get_tts_backend_for_engine(engine)
+    voice_prompt = {
+        "voice_type": "preset",
+        "preset_engine": engine,
+        "preset_voice_id": voice_id,
+    }
+
+    try:
+        audio, sample_rate = await backend.generate(
+            text=preview_text,
+            voice_prompt=voice_prompt,
+            language=language,
+        )
+        save_audio(audio, str(cache_file), sample_rate=sample_rate)
+        return FileResponse(str(cache_file), media_type="audio/wav")
+    except Exception as e:
+        logger.error(f"Failed to generate preset preview for {engine}/{voice_id}: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to generate preview: {e}")
 
 @router.get("/profiles/{profile_id}", response_model=models.VoiceProfileResponse)
 async def get_profile(
