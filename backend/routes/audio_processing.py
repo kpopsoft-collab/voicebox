@@ -1,3 +1,4 @@
+import asyncio
 import logging
 from fastapi import APIRouter, File, HTTPException, UploadFile
 from fastapi.responses import Response
@@ -21,7 +22,7 @@ async def remove_bgm_endpoint(file: UploadFile = File(...)):
             raise HTTPException(status_code=400, detail="Empty audio file provided")
 
         logger.info(f"Received request to remove BGM from file: {file.filename} ({len(content)} bytes)")
-        clean_vocal_bytes = remove_background_music(content)
+        clean_vocal_bytes = await asyncio.to_thread(remove_background_music, content)
 
         return Response(
             content=clean_vocal_bytes,

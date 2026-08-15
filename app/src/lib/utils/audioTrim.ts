@@ -70,35 +70,37 @@ export async function trimAudioFile(
   const arrayBuffer = await file.arrayBuffer();
   const audioContext = new (window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext)();
   
-  const decodedBuffer = await audioContext.decodeAudioData(arrayBuffer);
-  
-  const startSec = Math.max(0, startTime);
-  const endSec = Math.min(decodedBuffer.duration, endTime);
-  const durationSec = Math.max(0.1, endSec - startSec);
-  
-  const startOffset = Math.floor(startSec * decodedBuffer.sampleRate);
-  const endOffset = Math.floor(endSec * decodedBuffer.sampleRate);
-  const frameCount = endOffset - startOffset;
-  
-  const trimmedBuffer = audioContext.createBuffer(
-    decodedBuffer.numberOfChannels,
-    frameCount,
-    decodedBuffer.sampleRate,
-  );
-  
-  for (let channel = 0; channel < decodedBuffer.numberOfChannels; channel++) {
-    const srcData = decodedBuffer.getChannelData(channel);
-    const destData = trimmedBuffer.getChannelData(channel);
-    destData.set(srcData.subarray(startOffset, endOffset));
+  try {
+    const decodedBuffer = await audioContext.decodeAudioData(arrayBuffer);
+    
+    const startSec = Math.max(0, startTime);
+    const endSec = Math.min(decodedBuffer.duration, endTime);
+    const durationSec = Math.max(0.1, endSec - startSec);
+    
+    const startOffset = Math.floor(startSec * decodedBuffer.sampleRate);
+    const endOffset = Math.floor(endSec * decodedBuffer.sampleRate);
+    const frameCount = endOffset - startOffset;
+    
+    const trimmedBuffer = audioContext.createBuffer(
+      decodedBuffer.numberOfChannels,
+      frameCount,
+      decodedBuffer.sampleRate,
+    );
+    
+    for (let channel = 0; channel < decodedBuffer.numberOfChannels; channel++) {
+      const srcData = decodedBuffer.getChannelData(channel);
+      const destData = trimmedBuffer.getChannelData(channel);
+      destData.set(srcData.subarray(startOffset, endOffset));
+    }
+    
+    const blob = audioBufferToWavBlob(trimmedBuffer);
+    const baseName = file.name.replace(/\.[^/.]+$/, '');
+    const newFileName = `${baseName}_trimmed_${Math.round(durationSec)}s.wav`;
+    
+    return new File([blob], newFileName, { type: 'audio/wav' });
+  } finally {
+    await audioContext.close();
   }
-  
-  await audioContext.close();
-  
-  const blob = audioBufferToWavBlob(trimmedBuffer);
-  const baseName = file.name.replace(/\.[^/.]+$/, '');
-  const newFileName = `${baseName}_trimmed_${Math.round(durationSec)}s.wav`;
-  
-  return new File([blob], newFileName, { type: 'audio/wav' });
 }
 
 /**
@@ -110,31 +112,33 @@ export async function getAudioWaveformData(
 ): Promise<{ peaks: number[]; duration: number }> {
   const arrayBuffer = await file.arrayBuffer();
   const audioContext = new (window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext)();
-  const decodedBuffer = await audioContext.decodeAudioData(arrayBuffer);
-  
-  const rawData = decodedBuffer.getChannelData(0); // Use first channel
-  const totalSamples = rawData.length;
-  const count = Math.min(samplesCount, Math.max(120, totalSamples));
-  const blockSize = Math.max(1, Math.floor(totalSamples / count));
-  const peaks: number[] = [];
-  
-  for (let i = 0; i < count; i++) {
-    const start = i * blockSize;
-    const end = Math.min(start + blockSize, totalSamples);
-    let max = 0;
-    for (let j = start; j < end; j++) {
-      const val = Math.abs(rawData[j] || 0);
-      if (val > max) max = val;
+
+  try {
+    const decodedBuffer = await audioContext.decodeAudioData(arrayBuffer);
+    
+    const rawData = decodedBuffer.getChannelData(0); // Use first channel
+    const totalSamples = rawData.length;
+    const count = Math.min(samplesCount, Math.max(120, totalSamples));
+    const blockSize = Math.max(1, Math.floor(totalSamples / count));
+    const peaks: number[] = [];
+    
+    for (let i = 0; i < count; i++) {
+      const start = i * blockSize;
+      const end = Math.min(start + blockSize, totalSamples);
+      let max = 0;
+      for (let j = start; j < end; j++) {
+        const val = Math.abs(rawData[j] || 0);
+        if (val > max) max = val;
+      }
+      peaks.push(max);
     }
-    peaks.push(max);
+    
+    // Normalize peaks between 0.05 and 1.0
+    const maxPeak = Math.max(...peaks, 0.001);
+    const normalizedPeaks = peaks.map((p) => Math.max(0.06, p / maxPeak));
+    
+    return { peaks: normalizedPeaks, duration: decodedBuffer.duration };
+  } finally {
+    await audioContext.close();
   }
-  
-  // Normalize peaks between 0.05 and 1.0
-  const maxPeak = Math.max(...peaks, 0.001);
-  const normalizedPeaks = peaks.map((p) => Math.max(0.06, p / maxPeak));
-  
-  const duration = decodedBuffer.duration;
-  await audioContext.close();
-  
-  return { peaks: normalizedPeaks, duration };
 }

@@ -1,5 +1,6 @@
 import io
 import logging
+import threading
 import torch
 import torchaudio
 import soundfile as sf
@@ -10,15 +11,19 @@ from demucs.audio import convert_audio
 logger = logging.getLogger(__name__)
 
 _demucs_model = None
+_demucs_lock = threading.Lock()
 
 def get_vocal_separator_model():
-    """Lazy-load the Demucs htdemucs model on demand."""
+    """Lazy-load the Demucs htdemucs model on demand (thread-safe)."""
     global _demucs_model
     if _demucs_model is None:
-        logger.info("Loading Demucs htdemucs model for vocal isolation...")
-        _demucs_model = get_model('htdemucs')
-        _demucs_model.eval()
-        logger.info("Demucs htdemucs model loaded successfully.")
+        with _demucs_lock:
+            # Double-checked locking: re-check after acquiring the lock
+            if _demucs_model is None:
+                logger.info("Loading Demucs htdemucs model for vocal isolation...")
+                _demucs_model = get_model('htdemucs')
+                _demucs_model.eval()
+                logger.info("Demucs htdemucs model loaded successfully.")
     return _demucs_model
 
 def remove_background_music(audio_bytes: bytes, target_sr: int = 44100) -> bytes:

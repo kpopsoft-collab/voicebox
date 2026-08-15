@@ -63,6 +63,14 @@ export function AudioTrimmerModal({
   const draggingRef = useRef<'start' | 'end' | 'pan' | 'create' | null>(null);
   const dragStartXRef = useRef(0);
   const initialRangeRef = useRef<{ start: number; end: number }>({ start: 0, end: 10 });
+  const dragCleanupRef = useRef<(() => void) | null>(null);
+  const bgmUrlRef = useRef<string | null>(null);
+
+  // Refs to avoid stale closures in rAF playback loop
+  const endTimeRef = useRef(endTime);
+  const startTimeRef = useRef(startTime);
+  useEffect(() => { endTimeRef.current = endTime; }, [endTime]);
+  useEffect(() => { startTimeRef.current = startTime; }, [startTime]);
 
   // Load waveform and duration when file changes
   useEffect(() => {
@@ -101,8 +109,18 @@ export function AudioTrimmerModal({
         audioRef.current = null;
       }
       URL.revokeObjectURL(url);
+      // Revoke BGM-generated URL if any
+      if (bgmUrlRef.current) {
+        URL.revokeObjectURL(bgmUrlRef.current);
+        bgmUrlRef.current = null;
+      }
       if (animationFrameRef.current) {
         cancelAnimationFrame(animationFrameRef.current);
+      }
+      // Clean up any dangling drag event listeners
+      if (dragCleanupRef.current) {
+        dragCleanupRef.current();
+        dragCleanupRef.current = null;
       }
     };
   }, [open, file]);
@@ -143,10 +161,11 @@ export function AudioTrimmerModal({
           setPlayProgress(current / duration);
         }
 
-        if (current >= endTime) {
+        // Use refs to get latest values, avoiding stale closures
+        if (current >= endTimeRef.current) {
           audioRef.current.pause();
           setIsPlaying(false);
-          setPlayProgress(startTime / duration);
+          setPlayProgress(startTimeRef.current / duration);
         } else {
           animationFrameRef.current = requestAnimationFrame(checkTime);
         }
@@ -304,10 +323,16 @@ export function AudioTrimmerModal({
       draggingRef.current = null;
       window.removeEventListener('mousemove', handleMouseMove);
       window.removeEventListener('mouseup', handleMouseUp);
+      dragCleanupRef.current = null;
     };
 
     window.addEventListener('mousemove', handleMouseMove);
     window.addEventListener('mouseup', handleMouseUp);
+    // Store cleanup in ref so unmount can remove listeners if needed
+    dragCleanupRef.current = () => {
+      window.removeEventListener('mousemove', handleMouseMove);
+      window.removeEventListener('mouseup', handleMouseUp);
+    };
   };
 
   const handleWaveformClick = (e: React.MouseEvent) => {
@@ -347,7 +372,12 @@ export function AudioTrimmerModal({
       if (audioRef.current) {
         audioRef.current.pause();
       }
+      // Revoke previous BGM URL before creating a new one
+      if (bgmUrlRef.current) {
+        URL.revokeObjectURL(bgmUrlRef.current);
+      }
       const url = URL.createObjectURL(vocalOnlyFile);
+      bgmUrlRef.current = url;
       audioRef.current = new Audio(url);
 
       toast({

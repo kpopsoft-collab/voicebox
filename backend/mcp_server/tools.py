@@ -170,6 +170,7 @@ def register_tools(mcp: FastMCP) -> None:
             completed_gen = None
 
             while (asyncio.get_event_loop().time() - start_time) < timeout_seconds:
+                db.expire_all()
                 db_row = db.query(DBGeneration).filter(DBGeneration.id == gen_id).first()
                 if db_row and db_row.status == "completed":
                     completed_gen = db_row

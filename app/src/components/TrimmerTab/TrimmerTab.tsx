@@ -81,11 +81,21 @@ export function TrimmerTab() {
   const clipAudioRef = useRef<HTMLAudioElement | null>(null);
 
   const audioRef = useRef<HTMLAudioElement | null>(null);
+  const audioUrlRef = useRef<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const animationFrameRef = useRef<number | null>(null);
   const draggingRef = useRef<'start' | 'end' | 'pan' | 'create' | 'minimap' | null>(null);
   const dragStartXRef = useRef(0);
   const initialRangeRef = useRef<{ start: number; end: number }>({ start: 0, end: 10 });
+  const dragCleanupRef = useRef<(() => void) | null>(null);
+
+  // Refs to avoid stale closures in rAF playback loop
+  const endTimeRef = useRef(endTime);
+  const startTimeRef = useRef(startTime);
+  const isLoopingRef = useRef(isLooping);
+  useEffect(() => { endTimeRef.current = endTime; }, [endTime]);
+  useEffect(() => { startTimeRef.current = startTime; }, [startTime]);
+  useEffect(() => { isLoopingRef.current = isLooping; }, [isLooping]);
 
   const stopPlayback = useCallback(() => {
     if (audioRef.current) {
@@ -121,7 +131,12 @@ export function TrimmerTab() {
     if (audioRef.current) {
       audioRef.current.pause();
     }
+    // Revoke previous object URL to prevent memory leak
+    if (audioUrlRef.current) {
+      URL.revokeObjectURL(audioUrlRef.current);
+    }
     const url = URL.createObjectURL(selectedFile);
+    audioUrlRef.current = url;
     const audio = new Audio(url);
     audioRef.current = audio;
   }, [stopPlayback]);
@@ -138,6 +153,21 @@ export function TrimmerTab() {
       }
       if (animationFrameRef.current) {
         cancelAnimationFrame(animationFrameRef.current);
+      }
+      // Revoke main audio object URL
+      if (audioUrlRef.current) {
+        URL.revokeObjectURL(audioUrlRef.current);
+        audioUrlRef.current = null;
+      }
+      // Revoke all trimmed clip URLs
+      setTrimmedClips((clips) => {
+        clips.forEach((clip) => URL.revokeObjectURL(clip.url));
+        return [];
+      });
+      // Clean up any dangling drag event listeners
+      if (dragCleanupRef.current) {
+        dragCleanupRef.current();
+        dragCleanupRef.current = null;
       }
     };
   }, []);
@@ -169,14 +199,15 @@ export function TrimmerTab() {
           setPlayProgress(current / duration);
         }
 
-        if (current >= endTime) {
-          if (isLooping) {
-            audioRef.current.currentTime = startTime;
+        // Use refs to get latest values, avoiding stale closures
+        if (current >= endTimeRef.current) {
+          if (isLoopingRef.current) {
+            audioRef.current.currentTime = startTimeRef.current;
             animationFrameRef.current = requestAnimationFrame(checkTime);
           } else {
             audioRef.current.pause();
             setIsPlaying(false);
-            setPlayProgress(startTime / duration);
+            setPlayProgress(startTimeRef.current / duration);
           }
         } else {
           animationFrameRef.current = requestAnimationFrame(checkTime);
@@ -354,10 +385,16 @@ export function TrimmerTab() {
       draggingRef.current = null;
       window.removeEventListener('mousemove', handleMouseMove);
       window.removeEventListener('mouseup', handleMouseUp);
+      dragCleanupRef.current = null;
     };
 
     window.addEventListener('mousemove', handleMouseMove);
     window.addEventListener('mouseup', handleMouseUp);
+    // Store cleanup in ref so unmount can remove listeners if needed
+    dragCleanupRef.current = () => {
+      window.removeEventListener('mousemove', handleMouseMove);
+      window.removeEventListener('mouseup', handleMouseUp);
+    };
   };
 
   // Clicking on background simply moves the playhead/cursor, NEVER shrinking the selection
