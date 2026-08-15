@@ -54,6 +54,7 @@ def register_tools(mcp: FastMCP) -> None:
         engine: str | None = None,
         personality: bool | None = None,
         language: str = "ko",
+        instruct: str | None = None,
         model_size: Literal["1.7B", "0.6B", "1B", "3B"] | None = None,
     ) -> dict[str, Any]:
         """Speak ``text`` in a voice profile asynchronously."""
@@ -66,7 +67,7 @@ def register_tools(mcp: FastMCP) -> None:
             if vp is None:
                 raise ValueError(
                     "No voice profile resolved. Pass `profile=` with a "
-                    "voice profile name or id (e.g. '소희', '이야기 할머니'), "
+                    "voice profile name or id (e.g. '소희', '이야기 할머니', '하츄핑'), "
                     "or call `voicebox.list_profiles` to view available voices."
                 )
 
@@ -94,6 +95,7 @@ def register_tools(mcp: FastMCP) -> None:
                 engine=resolved_engine,
                 language=language,
                 personality=use_persona,
+                instruct=instruct,
                 model_size=model_size,
                 db=db,
             )
@@ -106,7 +108,7 @@ def register_tools(mcp: FastMCP) -> None:
         description=(
             "Generate speech from text and WAIT until audio synthesis is complete. "
             "Returns the final audio file path, duration, and optional base64 audio data. "
-            "Recommended for AI agents who want to immediately use the generated audio."
+            "Pass `instruct=` to control tone, emotion, pitch, and character style (e.g. '높고 귀여운 하이톤 요정 목소리')."
         ),
     )
     async def voicebox_generate_audio(
@@ -115,6 +117,7 @@ def register_tools(mcp: FastMCP) -> None:
         language: str = "ko",
         engine: str | None = None,
         personality: bool | None = None,
+        instruct: str | None = None,
         return_base64: bool = False,
         timeout_seconds: float = 60.0,
     ) -> dict[str, Any]:
@@ -157,6 +160,7 @@ def register_tools(mcp: FastMCP) -> None:
                 engine=resolved_engine,
                 language=language,
                 personality=use_persona,
+                instruct=instruct,
                 model_size=None,
                 db=db,
             )
@@ -190,6 +194,160 @@ def register_tools(mcp: FastMCP) -> None:
                 "generation_id": gen_id,
                 "status": "completed",
                 "profile": vp.name,
+                "text": completed_gen.text,
+                "duration": completed_gen.duration,
+                "audio_path": audio_path,
+                "audio_url": f"/audio/{gen_id}",
+            }
+
+            if return_base64 and audio_path and os.path.exists(audio_path):
+                with open(audio_path, "rb") as f:
+                    result["audio_base64"] = b64.b64encode(f.read()).decode("utf-8")
+
+            return result
+        finally:
+            db.close()
+
+    # ── 3. voicebox.hachuping (하츄핑 전용 완벽 재현 실시간 발화) ────────────
+    @mcp.tool(
+        name="voicebox.hachuping",
+        description=(
+            "Speak directly in the authentic 'Hachuping' (하츄핑) anime voice. "
+            "Automatically applies high-pitch fairy tone (Pitch Shift +3.5), "
+            "playful ~츄 ending style, and character persona with zero extra configuration."
+        ),
+    )
+    async def voicebox_hachuping(
+        text: str,
+        pitch_shift: float = 3.5,
+    ) -> dict[str, Any]:
+        """Speak in authentic Hachuping fairy voice with pitch correction."""
+        db = next(get_db())
+        try:
+            vp = resolve_profile("하츄핑", None, db)
+            if vp is None:
+                raise ValueError(
+                    "하츄핑 프로필을 찾을 수 없습니다. Voicebox 프로필에 '하츄핑'이 등록되어 있는지 확인해주세요."
+                )
+
+            # Auto-format text with ~츄 style if needed
+            formatted_text = text.strip()
+            if not any(formatted_text.endswith(s) for s in ["츄", "츄!", "츄?", "츄~", "츄."]):
+                if formatted_text.endswith((".", "!", "~")):
+                    formatted_text = formatted_text[:-1] + "츄!"
+                elif formatted_text.endswith("?"):
+                    formatted_text = formatted_text[:-1] + "츄?"
+                else:
+                    formatted_text = formatted_text + "츄!"
+
+            effects = [
+                models.EffectConfig(
+                    type="pitch_shift",
+                    enabled=True,
+                    params={"semitones": pitch_shift},
+                )
+            ] if pitch_shift != 0 else None
+
+            instruct = "매우 높고 맑은 초고음 여자 어린이 요정 목소리, 애교 넘치고 상냥하고 밝게 말하기"
+
+            return await _speak(
+                profile_id=vp.id,
+                profile_name=vp.name,
+                text=formatted_text,
+                engine="qwen",
+                language="ko",
+                personality=False,  # Already formatted
+                instruct=instruct,
+                effects_chain=effects,
+                model_size=None,
+                db=db,
+            )
+        finally:
+            db.close()
+
+    # ── 4. voicebox.hachuping_generate (하츄핑 전용 오디오 생성 및 파일 반환) ──
+    @mcp.tool(
+        name="voicebox.hachuping_generate",
+        description=(
+            "Generate authentic 'Hachuping' (하츄핑) audio file and WAIT until complete. "
+            "Returns audio file path and optional base64. Perfect for AI agents."
+        ),
+    )
+    async def voicebox_hachuping_generate(
+        text: str,
+        pitch_shift: float = 3.5,
+        return_base64: bool = False,
+        timeout_seconds: float = 60.0,
+    ) -> dict[str, Any]:
+        """Synthesize authentic Hachuping audio and return file path/base64."""
+        db = next(get_db())
+        try:
+            vp = resolve_profile("하츄핑", None, db)
+            if vp is None:
+                raise ValueError(
+                    "하츄핑 프로필을 찾을 수 없습니다. Voicebox 프로필에 '하츄핑'이 등록되어 있는지 확인해주세요."
+                )
+
+            formatted_text = text.strip()
+            if not any(formatted_text.endswith(s) for s in ["츄", "츄!", "츄?", "츄~", "츄."]):
+                if formatted_text.endswith((".", "!", "~")):
+                    formatted_text = formatted_text[:-1] + "츄!"
+                elif formatted_text.endswith("?"):
+                    formatted_text = formatted_text[:-1] + "츄?"
+                else:
+                    formatted_text = formatted_text + "츄!"
+
+            effects = [
+                models.EffectConfig(
+                    type="pitch_shift",
+                    enabled=True,
+                    params={"semitones": pitch_shift},
+                )
+            ] if pitch_shift != 0 else None
+
+            instruct = "매우 높고 맑은 초고음 여자 어린이 요정 목소리, 애교 넘치고 상냥하고 밝게 말하기"
+
+            speak_res = await _speak(
+                profile_id=vp.id,
+                profile_name=vp.name,
+                text=formatted_text,
+                engine="qwen",
+                language="ko",
+                personality=False,
+                instruct=instruct,
+                effects_chain=effects,
+                model_size=None,
+                db=db,
+            )
+
+            gen_id = speak_res.get("generation_id")
+            if not gen_id:
+                raise RuntimeError("Failed to obtain generation ID.")
+
+            start_time = asyncio.get_event_loop().time()
+            completed_gen = None
+
+            while (asyncio.get_event_loop().time() - start_time) < timeout_seconds:
+                db.expire_all()
+                db_row = db.query(DBGeneration).filter(DBGeneration.id == gen_id).first()
+                if db_row and db_row.status == "completed":
+                    completed_gen = db_row
+                    break
+                elif db_row and db_row.status == "failed":
+                    raise RuntimeError(f"Audio generation failed: {db_row.error or 'Unknown error'}")
+
+                await asyncio.sleep(0.3)
+
+            if not completed_gen:
+                raise TimeoutError(f"Hachuping generation timed out after {timeout_seconds}s.")
+
+            data_dir = config.get_data_dir()
+            audio_path = os.path.join(data_dir, completed_gen.audio_path) if completed_gen.audio_path else None
+
+            result: dict[str, Any] = {
+                "generation_id": gen_id,
+                "status": "completed",
+                "character": "하츄핑",
                 "text": completed_gen.text,
                 "duration": completed_gen.duration,
                 "audio_path": audio_path,
@@ -549,6 +707,8 @@ async def _speak(
     engine: str | None,
     language: str | None,
     personality: bool,
+    instruct: str | None = None,
+    effects_chain: list[models.EffectConfig] | None = None,
     model_size: str | None = None,
     db,
 ) -> dict[str, Any]:
@@ -562,6 +722,8 @@ async def _speak(
         language=language or "ko",
         engine=engine,
         personality=personality,
+        instruct=instruct,
+        effects_chain=effects_chain,
         model_size=model_size,
     )
     generation = await generate_speech(req, db)
