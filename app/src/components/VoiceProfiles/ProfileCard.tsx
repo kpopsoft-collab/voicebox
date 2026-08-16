@@ -13,9 +13,12 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
+import { apiClient } from '@/lib/api/client';
 import type { VoiceProfileResponse } from '@/lib/api/types';
 import { useDeleteProfile, useExportProfile } from '@/lib/hooks/useProfiles';
 import { cn } from '@/lib/utils/cn';
+import { usePlayerStore } from '@/stores/playerStore';
+import { useServerStore } from '@/stores/serverStore';
 import { useUIStore } from '@/stores/uiStore';
 
 /** Human-readable display names for preset engine badges. */
@@ -39,6 +42,7 @@ export function ProfileCard({ profile, disabled }: ProfileCardProps) {
   const setProfileDialogOpen = useUIStore((state) => state.setProfileDialogOpen);
   const selectedProfileId = useUIStore((state) => state.selectedProfileId);
   const setSelectedProfileId = useUIStore((state) => state.setSelectedProfileId);
+  const setAudioWithAutoPlay = usePlayerStore((state) => state.setAudioWithAutoPlay);
 
   const isSelected = selectedProfileId === profile.id;
 
@@ -48,6 +52,35 @@ export function ProfileCard({ profile, disabled }: ProfileCardProps) {
       setTimeout(() => setSelectedProfileId(profile.id), 0);
       return;
     }
+
+    if (!isSelected) {
+      (async () => {
+        try {
+          const serverUrl = useServerStore.getState().serverUrl;
+          if (profile.voice_type === 'preset' && profile.preset_engine && profile.preset_voice_id) {
+            setAudioWithAutoPlay(
+              `${serverUrl}/profiles/presets/${profile.preset_engine}/${profile.preset_voice_id}/preview`,
+              profile.id,
+              profile.id,
+              profile.name,
+            );
+          } else if (profile.sample_count > 0) {
+            const samples = await apiClient.listProfileSamples(profile.id);
+            if (samples.length > 0) {
+              setAudioWithAutoPlay(
+                `${serverUrl}${samples[0].audio_path}`,
+                samples[0].id,
+                profile.id,
+                profile.name,
+              );
+            }
+          }
+        } catch (e) {
+          console.error('Failed to play preview:', e);
+        }
+      })();
+    }
+
     setSelectedProfileId(isSelected ? null : profile.id);
   };
 
@@ -126,9 +159,7 @@ export function ProfileCard({ profile, disabled }: ProfileCardProps) {
             {profile.effects_chain && profile.effects_chain.length > 0 && (
               <Sparkles className="h-3.5 w-3.5 text-accent fill-accent" />
             )}
-            {profile.personality?.trim() && (
-              <Wand2 className="h-3.5 w-3.5 text-accent" />
-            )}
+            {profile.personality?.trim() && <Wand2 className="h-3.5 w-3.5 text-accent" />}
           </div>
           <div className="flex gap-0.5 justify-end items-end mt-auto">
             <CircleButton
