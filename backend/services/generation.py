@@ -42,6 +42,7 @@ async def run_generation(
     max_chunk_chars: Optional[int] = None,
     crossfade_ms: Optional[int] = None,
     version_id: Optional[str] = None,
+    output_format: str = "wav",
 ) -> None:
     """Execute TTS inference and persist the result.
 
@@ -108,6 +109,7 @@ async def run_generation(
                 effects_chain=effects_chain,
                 save_audio=save_audio,
                 db=bg_db,
+                output_format=output_format,
             )
         elif mode == "retry":
             final_path = _save_retry(
@@ -115,6 +117,7 @@ async def run_generation(
                 audio=audio,
                 sample_rate=sample_rate,
                 save_audio=save_audio,
+                output_format=output_format,
             )
         elif mode == "regenerate":
             final_path = _save_regenerate(
@@ -124,6 +127,7 @@ async def run_generation(
                 sample_rate=sample_rate,
                 save_audio=save_audio,
                 db=bg_db,
+                output_format=output_format,
             )
 
         await history.update_generation_status(
@@ -180,6 +184,7 @@ def _save_generate(
     effects_chain: Optional[list],
     save_audio,
     db,
+    output_format: str = "wav",
 ) -> str:
     """Save clean version and optionally an effects-processed version.
 
@@ -188,7 +193,8 @@ def _save_generate(
     """
     from . import versions as versions_mod
 
-    clean_audio_path = config.get_generations_dir() / f"{generation_id}.wav"
+    ext = output_format.lower()
+    clean_audio_path = config.get_generations_dir() / f"{generation_id}.{ext}"
     save_audio(audio, str(clean_audio_path), sample_rate)
 
     has_effects = effects_chain and any(e.get("enabled", True) for e in effects_chain)
@@ -218,7 +224,7 @@ def _save_generate(
             )
         else:
             processed_audio = apply_effects(audio, sample_rate, effects_chain)
-            processed_path = config.get_generations_dir() / f"{generation_id}_processed.wav"
+            processed_path = config.get_generations_dir() / f"{generation_id}_processed.{ext}"
             save_audio(processed_audio, str(processed_path), sample_rate)
             final_audio_path = str(processed_path)
             versions_mod.create_version(
@@ -239,12 +245,14 @@ def _save_retry(
     audio,
     sample_rate: int,
     save_audio,
+    output_format: str = "wav",
 ) -> str:
     """Save retry output -- single file, no versions.
 
     Returns the audio path.
     """
-    audio_path = config.get_generations_dir() / f"{generation_id}.wav"
+    ext = output_format.lower()
+    audio_path = config.get_generations_dir() / f"{generation_id}.{ext}"
     save_audio(audio, str(audio_path), sample_rate)
     return config.to_storage_path(audio_path)
 
@@ -326,22 +334,21 @@ async def generate_audio_sync(
 def _save_regenerate(
     *,
     generation_id: str,
-    version_id: Optional[str],
+    version_id: str,
     audio,
     sample_rate: int,
     save_audio,
     db,
+    output_format: str = "wav",
 ) -> str:
-    """Save regeneration output as a new version with auto-label.
+    """Save a regenerated variation.
 
-    Returns the audio path.
+    Creates a new version record. Returns the new audio path.
     """
     from . import versions as versions_mod
 
-    import uuid as _uuid
-
-    suffix = _uuid.uuid4().hex[:8]
-    audio_path = config.get_generations_dir() / f"{generation_id}_{suffix}.wav"
+    ext = output_format.lower()
+    audio_path = config.get_generations_dir() / f"{generation_id}_{version_id}.{ext}"
     save_audio(audio, str(audio_path), sample_rate)
 
     # Count via DB query rather than list length to avoid TOCTOU race

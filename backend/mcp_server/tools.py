@@ -56,6 +56,7 @@ def register_tools(mcp: FastMCP) -> None:
         language: str = "ko",
         instruct: str | None = None,
         model_size: Literal["1.7B", "0.6B", "1B", "3B"] | None = None,
+        output_format: Literal["wav", "mp3"] = "wav",
     ) -> dict[str, Any]:
         """Speak ``text`` in a voice profile asynchronously."""
         from ..database.models import MCPClientBinding
@@ -98,6 +99,7 @@ def register_tools(mcp: FastMCP) -> None:
                 instruct=instruct,
                 model_size=model_size,
                 db=db,
+                output_format=output_format,
             )
         finally:
             db.close()
@@ -121,6 +123,7 @@ def register_tools(mcp: FastMCP) -> None:
         return_base64: bool = False,
         timeout_seconds: float = 60.0,
         model_size: Literal["1.7B", "0.6B", "1B", "3B"] | None = None,
+        output_format: Literal["wav", "mp3"] = "wav",
     ) -> dict[str, Any]:
         """Synthesize speech and block until audio is ready."""
         from ..database.models import MCPClientBinding
@@ -164,6 +167,7 @@ def register_tools(mcp: FastMCP) -> None:
                 instruct=instruct,
                 model_size=model_size,
                 db=db,
+                output_format=output_format,
             )
 
             gen_id = speak_res.get("generation_id")
@@ -217,6 +221,26 @@ def register_tools(mcp: FastMCP) -> None:
                     return p
         return resolve_profile("하츄핑", None, session) or resolve_profile("하츄핑-영어", None, session)
 
+    def _format_alphabet_for_kids(text: str, language: str) -> str:
+        """아이들이 알파벳을 따라할 수 있도록 단일 문자 나열 시 마침표와 줄바꿈을 강제로 삽입해 느리게 발음하도록 튜닝합니다."""
+        import re
+        if language.lower() in ("en", "english"):
+            cleaned = text.strip()
+            
+            # 알파벳 문자열 (예: "ABCDEFGHIJKLMNOPQRSTUVWXYZ")의 부분 문자열인지 확인
+            is_alphabet_sequence = False
+            if cleaned.upper() in "ABCDEFGHIJKLMNOPQRSTUVWXYZ" and len(cleaned) >= 2:
+                is_alphabet_sequence = True
+                
+            # "A B C D", "A, B, C", "A" 와 같은 단일 알파벳 나열 패턴인지 확인
+            is_spaced_letters = bool(re.match(r"^([a-zA-Z][\s,]+)*[a-zA-Z]$", cleaned))
+            
+            if is_alphabet_sequence or is_spaced_letters:
+                letters = re.findall(r"[a-zA-Z]", cleaned)
+                # Qwen-TTS가 충분히 쉬도록 글자 사이에 마침표와 다수의 줄바꿈을 삽입
+                return ".\n\n\n\n".join(l.upper() for l in letters) + "."
+        return text
+
     # ── 3. voicebox.hachuping (하츄핑 프로필 웹 UI와 100% 동일 발화) ────────────
     @mcp.tool(
         name="voicebox.hachuping",
@@ -228,6 +252,7 @@ def register_tools(mcp: FastMCP) -> None:
     async def voicebox_hachuping(
         text: str,
         language: str = "ko",
+        output_format: Literal["wav", "mp3"] = "wav",
     ) -> dict[str, Any]:
         """Speak using the exact Hachuping profile identical to web UI."""
         db = next(get_db())
@@ -238,10 +263,12 @@ def register_tools(mcp: FastMCP) -> None:
                     "하츄핑 프로필을 찾을 수 없습니다. Voicebox 프로필에 '하츄핑' 또는 '하츄핑-영어'가 등록되어 있는지 확인해주세요."
                 )
 
+            formatted_text = _format_alphabet_for_kids(text, language)
+
             return await _speak(
                 profile_id=vp.id,
                 profile_name=vp.name,
-                text=text,
+                text=formatted_text,
                 engine="qwen",
                 language=language,
                 personality=False,
@@ -249,6 +276,7 @@ def register_tools(mcp: FastMCP) -> None:
                 effects_chain=None,
                 model_size="1.7B",
                 db=db,
+                output_format=output_format,
             )
         finally:
             db.close()
@@ -266,6 +294,7 @@ def register_tools(mcp: FastMCP) -> None:
         language: str = "ko",
         return_base64: bool = False,
         timeout_seconds: float = 60.0,
+        output_format: Literal["wav", "mp3"] = "wav",
     ) -> dict[str, Any]:
         """Synthesize Hachuping audio exactly identical to web UI."""
         db = next(get_db())
@@ -276,10 +305,12 @@ def register_tools(mcp: FastMCP) -> None:
                     "하츄핑 프로필을 찾을 수 없습니다. Voicebox 프로필에 '하츄핑' 또는 '하츄핑-영어'가 등록되어 있는지 확인해주세요."
                 )
 
+            formatted_text = _format_alphabet_for_kids(text, language)
+
             speak_res = await _speak(
                 profile_id=vp.id,
                 profile_name=vp.name,
-                text=text,
+                text=formatted_text,
                 engine="qwen",
                 language=language,
                 personality=False,
@@ -287,6 +318,7 @@ def register_tools(mcp: FastMCP) -> None:
                 effects_chain=None,
                 model_size="1.7B",
                 db=db,
+                output_format=output_format,
             )
 
             gen_id = speak_res.get("generation_id")
@@ -357,6 +389,7 @@ def register_tools(mcp: FastMCP) -> None:
         text: str,
         return_base64: bool = False,
         timeout_seconds: float = 60.0,
+        output_format: Literal["wav", "mp3"] = "wav",
     ) -> dict[str, Any]:
         """Synthesize English Hachuping audio and block until complete."""
         return await voicebox_hachuping_generate(
@@ -364,6 +397,7 @@ def register_tools(mcp: FastMCP) -> None:
             language="en",
             return_base64=return_base64,
             timeout_seconds=timeout_seconds,
+            output_format=output_format,
         )
 
     # ── 3. voicebox.create_profile (AI Voice Profile Creator) ────────────────
@@ -721,6 +755,7 @@ async def _speak(
     effects_chain: list[models.EffectConfig] | None = None,
     model_size: str | None = None,
     db,
+    output_format: Literal["wav", "mp3"] = "wav",
 ) -> dict[str, Any]:
     """Delegate to POST /generate — the route handles personality-rewrite
     internally when ``personality=true`` and the profile has a prompt."""
@@ -735,6 +770,7 @@ async def _speak(
         instruct=instruct,
         effects_chain=effects_chain,
         model_size=model_size,
+        output_format=output_format,
     )
     generation = await generate_speech(req, db)
     return _speak_response(generation, profile_name, source="mcp")

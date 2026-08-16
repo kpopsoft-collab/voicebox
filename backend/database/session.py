@@ -34,9 +34,11 @@ def init_db() -> None:
     _db_path = config.get_db_path()
     _db_path.parent.mkdir(parents=True, exist_ok=True)
 
+    from sqlalchemy.pool import NullPool
     engine = create_engine(
         f"sqlite:///{_db_path}",
         connect_args={"check_same_thread": False},
+        poolclass=NullPool,
     )
 
     SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)

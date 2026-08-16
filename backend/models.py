@@ -100,7 +100,9 @@ class GenerationRequest(BaseModel):
     effects_chain: Optional[List["EffectConfig"]] = Field(
         None, description="Effects chain to apply after generation (overrides profile default)"
     )
-
+    output_format: str = Field(
+        default="wav", pattern="^(wav|mp3)$", description="Output audio format"
+    )
 
 class GenerationResponse(BaseModel):
     """Response model for voice generation."""

@@ -92,9 +92,21 @@ def save_audio(
         # Ensure parent directory exists
         Path(path).parent.mkdir(parents=True, exist_ok=True)
 
-        # Write to temporary file first (explicit format since .tmp
-        # extension is not recognised by soundfile)
-        sf.write(temp_path, audio, sample_rate, format='WAV')
+        # Write to temporary file
+        is_mp3 = str(path).lower().endswith('.mp3')
+        if is_mp3:
+            from pydub import AudioSegment
+            audio_int16 = (audio * 32767.0).astype(np.int16)
+            channels = 1 if audio.ndim == 1 else audio.shape[1]
+            segment = AudioSegment(
+                audio_int16.tobytes(),
+                frame_rate=sample_rate,
+                sample_width=2,
+                channels=channels
+            )
+            segment.export(temp_path, format="mp3", bitrate="192k")
+        else:
+            sf.write(temp_path, audio, sample_rate, format='WAV')
 
         # Atomic rename to final path
         os.replace(temp_path, path)
