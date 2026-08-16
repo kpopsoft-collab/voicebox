@@ -13,6 +13,9 @@ scripts/*
 
 # Dependencies & build artifacts (rebuilt in Docker)
 node_modules/
+backend/venv/
+.venv/
+venv/
 __pycache__/
 *.pyc
 *.pyo

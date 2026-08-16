@@ -12,4 +12,8 @@ for dev in /dev/kfd /dev/dri/render*; do
     }
     usermod -aG "$grp" voicebox
 done
+
+mkdir -p /home/voicebox/.cache/huggingface /app/data
+chown -R voicebox:voicebox /home/voicebox/.cache /app/data 2>/dev/null || true
+
 exec gosu voicebox "$@"

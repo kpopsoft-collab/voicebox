@@ -4,9 +4,6 @@ import threading
 import torch
 import torchaudio
 import soundfile as sf
-from demucs.apply import apply_model
-from demucs.pretrained import get_model
-from demucs.audio import convert_audio
 
 logger = logging.getLogger(__name__)
 
@@ -20,6 +17,12 @@ def get_vocal_separator_model():
         with _demucs_lock:
             # Double-checked locking: re-check after acquiring the lock
             if _demucs_model is None:
+                try:
+                    from demucs.pretrained import get_model
+                except ImportError as e:
+                    raise RuntimeError(
+                        "demucs package is required for BGM removal. Please install demucs: pip install demucs"
+                    ) from e
                 logger.info("Loading Demucs htdemucs model for vocal isolation...")
                 _demucs_model = get_model('htdemucs')
                 _demucs_model.eval()
@@ -34,6 +37,14 @@ def remove_background_music(audio_bytes: bytes, target_sr: int = 44100) -> bytes
     Returns:
         WAV audio bytes containing only isolated vocals.
     """
+    try:
+        from demucs.apply import apply_model
+        from demucs.audio import convert_audio
+    except ImportError as e:
+        raise RuntimeError(
+            "demucs package is required for BGM removal. Please install demucs: pip install demucs"
+        ) from e
+
     model = get_vocal_separator_model()
     
     # Apple Silicon M3 Ultra handles 32-thread CPU inference extremely fast and reliably

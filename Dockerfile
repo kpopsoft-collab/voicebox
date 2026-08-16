@@ -42,7 +42,11 @@ WORKDIR /build
 RUN apt-get update && apt-get install -y --no-install-recommends \
     git \
     build-essential \
+    cmake \
+    pkg-config \
     && rm -rf /var/lib/apt/lists/*
+
+ENV CMAKE_POLICY_VERSION_MINIMUM=3.5
 
 RUN pip install --no-cache-dir --upgrade pip
 
