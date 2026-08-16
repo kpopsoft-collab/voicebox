@@ -68,6 +68,8 @@ export function AudioPlayer() {
   const wavesurferRef = useRef<WaveSurfer | null>(null);
   const loadingRef = useRef(false);
   const previousAudioIdRef = useRef<string | null>(null);
+  const lastLoadedUrlRef = useRef<string | null>(null);
+  const isAutoplayingRef = useRef(false);
   const hasInitializedRef = useRef(false);
   const isUsingNativePlaybackRef = useRef(false);
   const [isLoading, setIsLoading] = useState(false);
@@ -161,9 +163,17 @@ export function AudioPlayer() {
           const shouldAutoPlayNow = usePlayerStore.getState().shouldAutoPlay;
           if (shouldAutoPlayNow) {
             usePlayerStore.getState().clearAutoPlayFlag();
-            wavesurfer.play().catch((err) => {
-              debug.error('Failed to autoplay:', err);
-            });
+            isAutoplayingRef.current = true;
+            wavesurfer
+              .play()
+              .catch((err) => {
+                debug.error('Failed to autoplay:', err);
+              })
+              .finally(() => {
+                setTimeout(() => {
+                  isAutoplayingRef.current = false;
+                }, 300);
+              });
           } else {
             debug.log('Skipping auto-play - shouldAutoPlay is false');
           }
@@ -262,6 +272,7 @@ export function AudioPlayer() {
     if (!wavesurfer || !wsReady) return;
 
     if (!audioUrl) {
+      lastLoadedUrlRef.current = null;
       // No audio - pause and reset
       wavesurfer.pause();
       wavesurfer.seekTo(0);
@@ -273,6 +284,11 @@ export function AudioPlayer() {
       isUsingNativePlaybackRef.current = false;
       return;
     }
+
+    if (lastLoadedUrlRef.current === audioUrl) {
+      return;
+    }
+    lastLoadedUrlRef.current = audioUrl;
 
     // Reset native playback state
     isUsingNativePlaybackRef.current = false;
@@ -316,6 +332,7 @@ export function AudioPlayer() {
   // This effect is kept for external state changes but should be minimal
   useEffect(() => {
     if (!wavesurferRef.current || duration === 0) return;
+    if (isAutoplayingRef.current) return;
 
     if (isPlaying && wavesurferRef.current.isPlaying() === false) {
       wavesurferRef.current.play().catch((error) => {

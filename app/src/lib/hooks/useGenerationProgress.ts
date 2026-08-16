@@ -42,6 +42,8 @@ export function useGenerationProgress() {
 
   // Track active EventSource instances
   const eventSourcesRef = useRef<Map<string, EventSource>>(new Map());
+  // Track already-handled completed generation IDs to prevent duplicate playback
+  const handledCompletedIdsRef = useRef<Set<string>>(new Set());
 
   // Unmount-only cleanup — close all SSE connections when the hook is torn down
   useEffect(() => {
@@ -81,6 +83,12 @@ export function useGenerationProgress() {
             currentSources.delete(id);
             removePendingGeneration(id);
 
+            // Ensure this generation is processed and auto-played exactly ONCE
+            if (handledCompletedIdsRef.current.has(id)) {
+              return;
+            }
+            handledCompletedIdsRef.current.add(id);
+
             // Refetch history to pick up the completed generation
             queryClient.refetchQueries({ queryKey: ['history'] });
 
@@ -106,13 +114,6 @@ export function useGenerationProgress() {
                     variant: 'destructive',
                   });
                 });
-            } else {
-              // toast({
-              //   title: 'Generation complete!',
-              //   description: data.duration
-              //     ? `Audio generated (${data.duration.toFixed(2)}s)`
-              //     : 'Audio generated',
-              // });
             }
 
             // Auto-play if enabled and nothing is currently playing.
