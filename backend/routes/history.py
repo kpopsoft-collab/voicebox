@@ -151,12 +151,18 @@ async def export_generation(
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-    safe_text = "".join(c for c in generation.text[:30] if c.isalnum() or c in (" ", "-", "_")).strip()
-    if not safe_text:
-        safe_text = "generation"
-    # Append a short id so exports of similarly-worded generations don't collide
-    # on the same filename (the first 30 chars are frequently identical).
-    filename = f"generation-{safe_text}-{generation_id[:8]}.voicebox.zip"
+    profile = db.query(DBVoiceProfile).filter_by(id=generation.profile_id).first()
+    profile_name = profile.name if profile else "voice"
+    safe_profile = "".join(c for c in profile_name if c not in r'/\:*?"<>|').strip().replace(" ", "_") or "voice"
+
+    created_time = generation.created_at
+    if created_time:
+        time_str = created_time.strftime("%Y%m%d_%H%M%S")
+    else:
+        from datetime import datetime
+        time_str = datetime.now().strftime("%Y%m%d_%H%M%S")
+
+    filename = f"{safe_profile}_{time_str}.voicebox.zip"
 
     return StreamingResponse(
         io.BytesIO(zip_bytes),
@@ -183,9 +189,17 @@ async def export_generation_audio(
     if audio_path is None or not audio_path.is_file():
         raise HTTPException(status_code=404, detail="Audio file not found")
 
-    safe_text = "".join(c for c in generation.text[:30] if c.isalnum() or c in (" ", "-", "_")).strip()
-    if not safe_text:
-        safe_text = "generation"
+    # Build filename: "음성프로필_시간.ext"
+    profile = db.query(DBVoiceProfile).filter_by(id=generation.profile_id).first()
+    profile_name = profile.name if profile else "voice"
+    safe_profile = "".join(c for c in profile_name if c not in r'/\:*?"<>|').strip().replace(" ", "_") or "voice"
+
+    created_time = generation.created_at
+    if created_time:
+        time_str = created_time.strftime("%Y%m%d_%H%M%S")
+    else:
+        from datetime import datetime
+        time_str = datetime.now().strftime("%Y%m%d_%H%M%S")
 
     # Support MP3 conversion
     if format.lower() == "mp3":
@@ -207,7 +221,7 @@ async def export_generation_audio(
                 logger.error(f"Failed to convert WAV to MP3: {e}, fallback error: {inner_e}")
                 raise HTTPException(status_code=500, detail=f"MP3 conversion failed: {e}")
 
-        filename = f"{safe_text}-{generation_id[:8]}.mp3"
+        filename = f"{safe_profile}_{time_str}.mp3"
         return Response(
             content=mp3_bytes,
             media_type="audio/mpeg",
@@ -215,7 +229,7 @@ async def export_generation_audio(
         )
 
     # Default WAV export
-    filename = f"{safe_text}-{generation_id[:8]}.wav"
+    filename = f"{safe_profile}_{time_str}.wav"
     return FileResponse(
         audio_path,
         media_type="audio/wav",

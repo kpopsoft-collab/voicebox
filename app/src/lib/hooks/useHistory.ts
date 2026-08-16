@@ -40,21 +40,57 @@ export function useClearFailedGenerations() {
   });
 }
 
+export function formatExportFilename(
+  profileName?: string,
+  createdAt?: string,
+  extension: string = 'wav',
+): string {
+  const safeProfile = (profileName || 'voice')
+    .replace(/[\\/:*?"<>|]/g, '')
+    .trim()
+    .replace(/\s+/g, '_') || 'voice';
+
+  let timeStr = '';
+  if (createdAt) {
+    const d = new Date(createdAt);
+    if (!isNaN(d.getTime())) {
+      const pad = (n: number) => n.toString().padStart(2, '0');
+      const yyyy = d.getFullYear();
+      const MM = pad(d.getMonth() + 1);
+      const dd = pad(d.getDate());
+      const hh = pad(d.getHours());
+      const mm = pad(d.getMinutes());
+      const ss = pad(d.getSeconds());
+      timeStr = `${yyyy}${MM}${dd}_${hh}${mm}${ss}`;
+    }
+  }
+
+  if (!timeStr) {
+    const now = new Date();
+    const pad = (n: number) => n.toString().padStart(2, '0');
+    timeStr = `${now.getFullYear()}${pad(now.getMonth() + 1)}${pad(now.getDate())}_${pad(now.getHours())}${pad(now.getMinutes())}${pad(now.getSeconds())}`;
+  }
+
+  const ext = extension.replace(/^\./, '').toLowerCase();
+  return `${safeProfile}_${timeStr}.${ext}`;
+}
+
 export function useExportGeneration() {
   const platform = usePlatform();
 
   return useMutation({
-    mutationFn: async ({ generationId, text }: { generationId: string; text: string }) => {
+    mutationFn: async ({
+      generationId,
+      profileName,
+      createdAt,
+    }: {
+      generationId: string;
+      profileName?: string;
+      createdAt?: string;
+      text?: string;
+    }) => {
       const blob = await apiClient.exportGeneration(generationId);
-
-      // Create safe filename from text. Append a short id so exports of
-      // similarly-worded generations don't collide on the same filename
-      // (the first 30 chars are frequently identical).
-      const safeText = text
-        .substring(0, 30)
-        .replace(/[^a-z0-9]/gi, '-')
-        .toLowerCase();
-      const filename = `generation-${safeText}-${generationId.substring(0, 8)}.voicebox.zip`;
+      const filename = formatExportFilename(profileName, createdAt, 'voicebox.zip');
 
       await platform.filesystem.saveFile(filename, blob, [
         {
@@ -74,24 +110,19 @@ export function useExportGenerationAudio() {
   return useMutation({
     mutationFn: async ({
       generationId,
-      text,
+      profileName,
+      createdAt,
       format = 'wav',
     }: {
       generationId: string;
-      text: string;
+      profileName?: string;
+      createdAt?: string;
+      text?: string;
       format?: 'wav' | 'mp3';
     }) => {
       const blob = await apiClient.exportGenerationAudio(generationId, format);
-
-      // Create safe filename from text. Append a short id so exports of
-      // similarly-worded generations don't collide on the same filename
-      // (the first 30 chars are frequently identical).
-      const safeText = text
-        .substring(0, 30)
-        .replace(/[^a-z0-9]/gi, '-')
-        .toLowerCase();
       const ext = format.toLowerCase();
-      const filename = `${safeText || 'generation'}-${generationId.substring(0, 8)}.${ext}`;
+      const filename = formatExportFilename(profileName, createdAt, ext);
 
       await platform.filesystem.saveFile(filename, blob, [
         {

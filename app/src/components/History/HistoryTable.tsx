@@ -386,11 +386,13 @@ export function HistoryTable() {
 
   const handleDownloadAudio = (
     generationId: string,
-    text: string,
+    profileName: string,
+    createdAt: string,
     format: 'wav' | 'mp3' = 'wav',
+    text?: string,
   ) => {
     exportGenerationAudio.mutate(
-      { generationId, text, format },
+      { generationId, profileName, createdAt, format, text },
       {
         onError: (error) => {
           toast({
@@ -403,13 +405,18 @@ export function HistoryTable() {
     );
   };
 
-  const handleExportPackage = (generationId: string, text: string) => {
+  const handleExportPackage = (
+    generationId: string,
+    profileName: string,
+    createdAt: string,
+    text?: string,
+  ) => {
     exportGeneration.mutate(
-      { generationId, text },
+      { generationId, profileName, createdAt, text },
       {
         onError: (error) => {
           toast({
-            title: 'Failed to export generation',
+            title: isKo ? '생성 내역 내보내기 실패' : 'Failed to export generation',
             description: error.message,
             variant: 'destructive',
           });
@@ -938,7 +945,15 @@ export function HistoryTable() {
                               </DropdownMenuSubTrigger>
                               <DropdownMenuSubContent>
                                 <DropdownMenuItem
-                                  onClick={() => handleDownloadAudio(gen.id, gen.text, 'wav')}
+                                  onClick={() =>
+                                    handleDownloadAudio(
+                                      gen.id,
+                                      gen.profile_name,
+                                      gen.created_at,
+                                      'wav',
+                                      gen.text,
+                                    )
+                                  }
                                   disabled={exportGenerationAudio.isPending}
                                   className="cursor-pointer flex items-center justify-between"
                                 >
@@ -948,7 +963,15 @@ export function HistoryTable() {
                                   </span>
                                 </DropdownMenuItem>
                                 <DropdownMenuItem
-                                  onClick={() => handleDownloadAudio(gen.id, gen.text, 'mp3')}
+                                  onClick={() =>
+                                    handleDownloadAudio(
+                                      gen.id,
+                                      gen.profile_name,
+                                      gen.created_at,
+                                      'mp3',
+                                      gen.text,
+                                    )
+                                  }
                                   disabled={exportGenerationAudio.isPending}
                                   className="cursor-pointer flex items-center justify-between"
                                 >
@@ -960,7 +983,14 @@ export function HistoryTable() {
                               </DropdownMenuSubContent>
                             </DropdownMenuSub>
                             <DropdownMenuItem
-                              onClick={() => handleExportPackage(gen.id, gen.text)}
+                              onClick={() =>
+                                handleExportPackage(
+                                  gen.id,
+                                  gen.profile_name,
+                                  gen.created_at,
+                                  gen.text,
+                                )
+                              }
                               disabled={exportGeneration.isPending}
                             >
                               <FileArchive className="mr-2 h-4 w-4" />
