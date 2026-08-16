@@ -216,6 +216,57 @@ async def get_preset_voice_preview(engine: str, voice_id: str):
         logger.error(f"Failed to generate preset preview for {engine}/{voice_id}: {e}")
         raise HTTPException(status_code=500, detail=f"Failed to generate preview: {e}")
 
+@router.get("/profiles/{profile_id}/preview")
+async def get_profile_preview(
+    profile_id: str,
+    db: Session = Depends(get_db),
+):
+    """Generate and return a short preview audio clip with a personalized greeting."""
+    from ..backends import get_tts_backend_for_engine
+    from ..utils.audio import save_audio
+    from .. import config
+
+    profile = await profiles.get_profile(profile_id, db)
+    if not profile:
+        raise HTTPException(status_code=404, detail="Profile not found")
+
+    cache_dir = config.get_data_dir() / "cache" / "profile_previews"
+    cache_dir.mkdir(parents=True, exist_ok=True)
+    cache_file = cache_dir / f"{profile_id}.wav"
+
+    if cache_file.exists() and cache_file.stat().st_size > 0:
+        return FileResponse(str(cache_file), media_type="audio/wav")
+
+    lang = profile.language or "en"
+    if lang == "ko":
+        preview_text = f"안녕하세요! 저는 {profile.name}입니다. 만나서 반가워요."
+    elif lang == "ja":
+        preview_text = f"こんにちは！私は {profile.name} です。よろしくお願いします。"
+    elif lang == "zh":
+        preview_text = f"你好！我是 {profile.name}。很高兴见到你。"
+    elif lang == "es":
+        preview_text = f"¡Hola! Soy {profile.name}. ¡Encantado de conocerte!"
+    elif lang == "fr":
+        preview_text = f"Bonjour! Je suis {profile.name}. Ravi de vous rencontrer!"
+    else:
+        preview_text = f"Hello! I'm {profile.name}. Nice to meet you."
+
+    engine = getattr(profile, "default_engine", None) or getattr(profile, "preset_engine", None) or "qwen"
+    backend = get_tts_backend_for_engine(engine)
+    voice_prompt = await profiles.create_voice_prompt_for_profile(profile_id, db)
+
+    try:
+        audio, sample_rate = await backend.generate(
+            text=preview_text,
+            voice_prompt=voice_prompt,
+            language=lang,
+        )
+        save_audio(audio, str(cache_file), sample_rate=sample_rate)
+        return FileResponse(str(cache_file), media_type="audio/wav")
+    except Exception as e:
+        logger.error(f"Failed to generate profile preview for {profile_id}: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to generate preview: {e}")
+
 @router.get("/profiles/{profile_id}", response_model=models.VoiceProfileResponse)
 async def get_profile(
     profile_id: str,
