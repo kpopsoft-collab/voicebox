@@ -14,13 +14,8 @@ services:
       - "127.0.0.1:17600:17493"
 
     volumes:
-      # Bind-mount for generated audio (customize the host path as needed)
-      # Host side:      ./output/
-      # Container side: /app/data/generations/
-      - ./output:/app/data/generations
-
-      # Named volume for profiles, DB, cache (persists across container restarts)
-      - voicebox-data:/app/data
+      # Bind-mount the entire data directory to share DB, profiles, and generations with the local host
+      - ./data:/app/data
 
       # HuggingFace model cache (so models aren't re-downloaded on rebuild)
       - huggingface-cache:/home/voicebox/.cache/huggingface
@@ -43,5 +38,4 @@ networks:
     driver: bridge
 
 volumes:
-  voicebox-data:
   huggingface-cache:
