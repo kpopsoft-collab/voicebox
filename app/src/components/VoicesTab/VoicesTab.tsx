@@ -1,8 +1,16 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { Mic, Plus, Search, Sparkles } from 'lucide-react';
+import { Mic, Plus, Search, Sparkles, Trash2 } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Button } from '@/components/ui/button';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 
 import { MultiSelect } from '@/components/ui/multi-select';
@@ -18,7 +26,7 @@ import { ProfileForm } from '@/components/VoiceProfiles/ProfileForm';
 import { apiClient } from '@/lib/api/client';
 import type { VoiceProfileResponse } from '@/lib/api/types';
 import { BOTTOM_SAFE_AREA_PADDING } from '@/lib/constants/ui';
-import { useProfiles } from '@/lib/hooks/useProfiles';
+import { useDeleteProfile, useProfiles } from '@/lib/hooks/useProfiles';
 import { cn } from '@/lib/utils/cn';
 import { usePlayerStore } from '@/stores/playerStore';
 import { useServerStore } from '@/stores/serverStore';
@@ -28,6 +36,9 @@ import { VoiceInspector } from './VoiceInspector';
 export function VoicesTab() {
   const { t } = useTranslation();
   const { data: profiles, isLoading } = useProfiles();
+  const deleteProfile = useDeleteProfile();
+  const [profileToDelete, setProfileToDelete] = useState<VoiceProfileResponse | null>(null);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const queryClient = useQueryClient();
   const setDialogOpen = useUIStore((state) => state.setProfileDialogOpen);
   const selectedVoiceId = useUIStore((state) => state.selectedVoiceId);
@@ -147,7 +158,7 @@ export function VoicesTab() {
                 <TableHead className="w-[8%]">{t('voicesTab.columns.samples')}</TableHead>
                 <TableHead className="w-[8%]">{t('voicesTab.columns.effects')}</TableHead>
                 <TableHead className="w-[24%]">{t('voicesTab.columns.channels')}</TableHead>
-                <TableHead className="w-6"></TableHead>
+                <TableHead className="w-12 text-right pr-6"></TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -160,6 +171,10 @@ export function VoicesTab() {
                   channelIds={channelAssignments?.[profile.id] || []}
                   channels={channels || []}
                   onChannelChange={(channelIds) => handleChannelChange(profile.id, channelIds)}
+                  onDelete={(p) => {
+                    setProfileToDelete(p);
+                    setDeleteDialogOpen(true);
+                  }}
                 />
               ))}
             </TableBody>
@@ -175,6 +190,45 @@ export function VoicesTab() {
       )}
 
       <ProfileForm />
+
+      {/* Delete Confirmation Dialog */}
+      <Dialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>{t('profiles.deleteDialog.title')}</DialogTitle>
+            <DialogDescription>
+              {t('profiles.deleteDialog.body', { name: profileToDelete?.name })}
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setDeleteDialogOpen(false);
+                setProfileToDelete(null);
+              }}
+            >
+              {t('common.cancel')}
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={() => {
+                if (profileToDelete) {
+                  deleteProfile.mutate(profileToDelete.id, {
+                    onSuccess: () => {
+                      setDeleteDialogOpen(false);
+                      setProfileToDelete(null);
+                    },
+                  });
+                }
+              }}
+              disabled={deleteProfile.isPending}
+            >
+              {deleteProfile.isPending ? t('profiles.deleteDialog.deleting') : t('common.delete')}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
@@ -186,6 +240,7 @@ interface VoiceRowProps {
   channelIds: string[];
   channels: Array<{ id: string; name: string; is_default: boolean }>;
   onChannelChange: (channelIds: string[]) => void;
+  onDelete: (profile: VoiceProfileResponse) => void;
 }
 
 function VoiceRow({
@@ -195,6 +250,7 @@ function VoiceRow({
   channelIds,
   channels,
   onChannelChange,
+  onDelete,
 }: VoiceRowProps) {
   const { t } = useTranslation();
   const serverUrl = useServerStore((state) => state.serverUrl);
@@ -259,7 +315,21 @@ function VoiceRow({
           className="w-full"
         />
       </TableCell>
-      <TableCell />
+      <TableCell onClick={(e) => e.stopPropagation()} className="text-right pr-6">
+        <Button
+          variant="ghost"
+          size="icon"
+          className="h-8 w-8 text-muted-foreground/60 hover:text-destructive hover:bg-destructive/10 transition-colors cursor-pointer"
+          onClick={(e) => {
+            e.stopPropagation();
+            onDelete(profile);
+          }}
+          aria-label={t('profiles.card.delete')}
+          title={t('profiles.card.delete')}
+        >
+          <Trash2 className="h-4 w-4" />
+        </Button>
+      </TableCell>
     </TableRow>
   );
 }
