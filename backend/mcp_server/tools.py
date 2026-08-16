@@ -120,6 +120,7 @@ def register_tools(mcp: FastMCP) -> None:
         instruct: str | None = None,
         return_base64: bool = False,
         timeout_seconds: float = 60.0,
+        model_size: Literal["1.7B", "0.6B", "1B", "3B"] | None = None,
     ) -> dict[str, Any]:
         """Synthesize speech and block until audio is ready."""
         from ..database.models import MCPClientBinding
@@ -161,7 +162,7 @@ def register_tools(mcp: FastMCP) -> None:
                 language=language,
                 personality=use_persona,
                 instruct=instruct,
-                model_size=None,
+                model_size=model_size,
                 db=db,
             )
 
@@ -400,31 +401,34 @@ def register_tools(mcp: FastMCP) -> None:
 
         db = next(get_db())
         try:
-            profile_id = str(uuid.uuid4())
-            profile = await profiles_service.create_profile(
+            data = models.VoiceProfileCreate(
                 name=name,
                 language=language,
                 description=description or f"Created via MCP for {name}",
-                db=db,
-                profile_id=profile_id,
+                personality=personality,
             )
+            profile = await profiles_service.create_profile(data=data, db=db)
 
-            # Update personality and reference text if provided
-            if personality or reference_text:
+            # Update reference text if provided
+            if reference_text:
                 update_req = models.ProfileUpdateRequest(
-                    personality=personality,
                     reference_text=reference_text,
                 )
                 await profiles_service.update_profile(profile.id, update_req, db)
 
             # Attach audio sample
-            sample = await profiles_service.add_sample(
-                profile_id=profile.id,
-                audio_bytes=raw_bytes,
-                filename=f"{name}_sample.wav",
-                db=db,
-                reference_text=reference_text,
-            )
+            with tempfile.NamedTemporaryFile(suffix=".wav", delete=False) as tmp:
+                tmp.write(raw_bytes)
+                tmp_path = tmp.name
+            try:
+                sample = await profiles_service.add_profile_sample(
+                    profile_id=profile.id,
+                    audio_path=tmp_path,
+                    reference_text=reference_text or "",
+                    db=db,
+                )
+            finally:
+                Path(tmp_path).unlink(missing_ok=True)
 
             return {
                 "id": profile.id,
@@ -571,7 +575,7 @@ def register_tools(mcp: FastMCP) -> None:
     )
     async def voicebox_get_status() -> dict[str, Any]:
         """Get overall status and capabilities of Voicebox."""
-        from ..backends import ENGINES
+        from ..backends import ENGINES, TTS_ENGINES
         from ..utils.platform_detect import get_backend_type
 
         db = next(get_db())
@@ -582,10 +586,13 @@ def register_tools(mcp: FastMCP) -> None:
             return {
                 "server": "Voicebox",
                 "backend": get_backend_type().upper(),
-                "available_engines": list(ENGINES.keys()),
+                "engines": list(TTS_ENGINES.keys()),
+                "available_engines": list(TTS_ENGINES.keys()),
                 "profiles_count": profile_count,
+                "voice_count": profile_count,
                 "generations_count": generation_count,
                 "supported_languages": ["ko", "en", "ja", "zh", "es", "fr", "de"],
+                "hardware": "Apple Silicon (MPS + 32 CPU Cores)",
                 "hardware_acceleration": "Apple Silicon (MPS + 32 CPU Cores)",
             }
         finally:

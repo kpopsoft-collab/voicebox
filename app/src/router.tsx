@@ -9,6 +9,7 @@ import { AppFrame } from '@/components/AppFrame/AppFrame';
 import { CapturesTab } from '@/components/CapturesTab/CapturesTab';
 import { EffectsTab } from '@/components/EffectsTab/EffectsTab';
 import { MainEditor } from '@/components/MainEditor/MainEditor';
+import { MCPTab } from '@/components/MCPTab/MCPTab';
 import { ModelsTab } from '@/components/ModelsTab/ModelsTab';
 import { AboutPage } from '@/components/ServerTab/AboutPage';
 import { CapturesPage } from '@/components/ServerTab/CapturesPage';
@@ -207,6 +208,13 @@ const trimmerRoute = createRoute({
   component: TrimmerTab,
 });
 
+// MCP route
+const mcpRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/mcp',
+  component: MCPTab,
+});
+
 // Route tree
 const routeTree = rootRoute.addChildren([
   indexRoute,
@@ -216,6 +224,7 @@ const routeTree = rootRoute.addChildren([
   trimmerRoute,
   effectsRoute,
   modelsRoute,
+  mcpRoute,
   settingsRoute.addChildren([
     settingsGeneralRoute,
     settingsGenerationRoute,

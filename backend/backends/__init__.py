@@ -223,6 +223,9 @@ LLM_ENGINES = {
     "qwen_llm": "Qwen3 LLM",
 }
 
+# Alias for backward compatibility with MCP server and external integrations
+ENGINES = TTS_ENGINES
+
 
 def _get_qwen_model_configs() -> list[ModelConfig]:
     """Return Qwen model configs with backend-aware HF repo IDs."""

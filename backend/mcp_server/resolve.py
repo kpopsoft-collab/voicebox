@@ -49,6 +49,16 @@ def resolve_profile(
         if profile is not None:
             return profile
 
+    # Fallback to the first available voice profile
+    first_profile = (
+        db.query(DBVoiceProfile)
+        .filter(DBVoiceProfile.voice_type != "import")
+        .order_by(DBVoiceProfile.created_at.asc())
+        .first()
+    )
+    if first_profile is not None:
+        return first_profile
+
     return None
 
 

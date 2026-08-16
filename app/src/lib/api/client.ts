@@ -334,6 +334,23 @@ class ApiClient {
     });
   }
 
+  async speak(
+    data: {
+      text: string;
+      profile?: string;
+      language?: string;
+      personality?: boolean;
+      engine?: string;
+    },
+    clientId?: string,
+  ): Promise<GenerationResponse> {
+    return this.request<GenerationResponse>(`/speak`, {
+      method: 'POST',
+      headers: clientId ? { 'X-Voicebox-Client-Id': clientId } : undefined,
+      body: JSON.stringify(data),
+    });
+  }
+
   async exportGeneration(generationId: string): Promise<Blob> {
     const url = `${this.getBaseUrl()}/history/${generationId}/export`;
     const response = await fetch(url);

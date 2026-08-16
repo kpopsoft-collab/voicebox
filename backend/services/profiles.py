@@ -3,6 +3,7 @@
 import json as _json
 import logging
 import shutil
+import unicodedata
 import uuid
 from datetime import datetime
 from pathlib import Path
@@ -155,7 +156,17 @@ async def create_profile(
     Raises:
         ValueError: If a profile with the same name already exists
     """
-    existing_profile = db.query(DBVoiceProfile).filter_by(name=data.name).first()
+    norm_name = unicodedata.normalize("NFC", data.name.strip())
+    existing_profile = (
+        db.query(DBVoiceProfile)
+        .filter(func.lower(DBVoiceProfile.name) == norm_name.lower())
+        .first()
+    )
+    if not existing_profile:
+        for p in db.query(DBVoiceProfile).all():
+            if unicodedata.normalize("NFC", p.name).strip().lower() == norm_name.lower():
+                existing_profile = p
+                break
     if existing_profile:
         raise ValueError(f"A profile with the name '{data.name}' already exists. Please choose a different name.")
 
@@ -177,7 +188,7 @@ async def create_profile(
 
     db_profile = DBVoiceProfile(
         id=str(uuid.uuid4()),
-        name=data.name,
+        name=norm_name,
         description=data.description,
         language=data.language,
         voice_type=voice_type,
@@ -288,17 +299,49 @@ def get_profile_orm_by_name_or_id(
 
     Id is tried first (fast path, matches UUIDs). Name fallback is
     case-insensitive so agents can say "Morgan" regardless of casing.
+    Also handles macOS NFD vs NFC Unicode normalization and fuzzy matches.
     """
     if not name_or_id:
         return None
+
+    # 1. Exact ID match (UUID)
     row = db.query(DBVoiceProfile).filter(DBVoiceProfile.id == name_or_id).first()
     if row is not None:
         return row
-    return (
+
+    # 2. Exact name match in SQL
+    row = (
         db.query(DBVoiceProfile)
         .filter(func.lower(DBVoiceProfile.name) == name_or_id.lower())
         .first()
     )
+    if row is not None:
+        return row
+
+    # 3. Unicode NFC-normalized match (handles macOS decomposed NFD hangul)
+    norm_query = unicodedata.normalize("NFC", name_or_id).strip().lower()
+    all_profiles = db.query(DBVoiceProfile).all()
+    for p in all_profiles:
+        if unicodedata.normalize("NFC", p.name).strip().lower() == norm_query:
+            return p
+
+    # 4. Fuzzy match (ignoring whitespace, hyphens, underscores)
+    fuzzy_query = (
+        norm_query.replace(" ", "").replace("-", "").replace("_", "")
+    )
+    for p in all_profiles:
+        p_fuzzy = (
+            unicodedata.normalize("NFC", p.name)
+            .strip()
+            .lower()
+            .replace(" ", "")
+            .replace("-", "")
+            .replace("_", "")
+        )
+        if p_fuzzy == fuzzy_query:
+            return p
+
+    return None
 
 
 async def get_profile_samples(
