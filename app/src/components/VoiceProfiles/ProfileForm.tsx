@@ -163,7 +163,7 @@ export function ProfileForm() {
   const transcribe = useTranscription();
   const { toast } = useToast();
   const [voiceSource, setVoiceSource] = useState<'clone' | 'builtin'>('clone');
-  const [sampleMode, setSampleMode] = useState<'upload' | 'record' | 'system'>('record');
+  const [sampleMode, setSampleMode] = useState<'upload' | 'record' | 'system'>('upload');
   const [audioDuration, setAudioDuration] = useState<number | null>(null);
   const [isValidatingAudio, setIsValidatingAudio] = useState(false);
   const [avatarPreview, setAvatarPreview] = useState<string | null>(null);
@@ -471,7 +471,7 @@ export function ProfileForm() {
         referenceText: undefined,
         avatarFile: undefined,
       });
-      setSampleMode('record');
+      setSampleMode('upload');
       setAvatarPreview(null);
     }
   }, [editingProfile, profileFormDraft, open, form]);
@@ -929,7 +929,7 @@ export function ProfileForm() {
                       referenceText: '',
                       avatarFile: undefined,
                     });
-                    setSampleMode('record');
+                    setSampleMode('upload');
                   }}
                 >
                   <X className="h-3 w-3 mr-1" />
