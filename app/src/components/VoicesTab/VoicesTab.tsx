@@ -60,14 +60,16 @@ export function VoicesTab() {
     );
   }, [profiles, search]);
 
-  // Auto-select first profile if none selected
+  // Auto-select '하츄핑' (or first profile) if none selected
   useEffect(() => {
     if (!selectedVoiceId && profiles && profiles.length > 0) {
-      setSelectedVoiceId(profiles[0].id);
+      const hachuping = profiles.find((p) => p.name.includes('하츄핑') || p.name.includes('하추핑'));
+      setSelectedVoiceId(hachuping ? hachuping.id : profiles[0].id);
     }
     // Clear selection if selected profile was deleted
     if (selectedVoiceId && profiles && !profiles.find((p) => p.id === selectedVoiceId)) {
-      setSelectedVoiceId(profiles.length > 0 ? profiles[0].id : null);
+      const hachuping = profiles.find((p) => p.name.includes('하츄핑') || p.name.includes('하추핑'));
+      setSelectedVoiceId(hachuping ? hachuping.id : (profiles.length > 0 ? profiles[0].id : null));
     }
   }, [profiles, selectedVoiceId, setSelectedVoiceId]);
 

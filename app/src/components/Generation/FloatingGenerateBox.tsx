@@ -128,10 +128,11 @@ export function FloatingGenerateBox({
     };
   }, [isExpanded]);
 
-  // Set first voice as default if none selected
+  // Set '하츄핑' (or first voice) as default if none selected
   useEffect(() => {
     if (!selectedProfileId && profiles && profiles.length > 0) {
-      setSelectedProfileId(profiles[0].id);
+      const hachuping = profiles.find((p) => p.name.includes('하츄핑') || p.name.includes('하추핑'));
+      setSelectedProfileId(hachuping ? hachuping.id : profiles[0].id);
     }
   }, [selectedProfileId, profiles, setSelectedProfileId]);
 
