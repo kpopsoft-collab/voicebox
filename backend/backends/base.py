@@ -264,7 +264,11 @@ def model_load_progress(
     task_manager = get_task_manager()
 
     progress_callback = create_hf_progress_callback(model_name, progress_manager)
-    tracker = HFProgressTracker(progress_callback, filter_non_downloads=filter_non_downloads)
+    tracker = HFProgressTracker(
+        progress_callback,
+        filter_non_downloads=filter_non_downloads,
+        min_total_bytes=1_000_000,
+    )
 
     tracker_context = tracker.patch_download()
     tracker_context.__enter__()

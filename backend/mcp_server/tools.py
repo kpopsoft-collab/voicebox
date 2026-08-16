@@ -208,24 +208,33 @@ def register_tools(mcp: FastMCP) -> None:
         finally:
             db.close()
 
+    def _resolve_hachuping(lang: str, session: Session) -> DBVoiceProfile | None:
+        if lang.lower() in ("en", "english"):
+            for candidate in ("하츄핑-영어", "하츄핑 (영어)", "하츄핑 영어", "하츄핑_영어", "하츄핑-en", "하츄핑 (English)", "하츄핑"):
+                p = resolve_profile(candidate, None, session)
+                if p is not None:
+                    return p
+        return resolve_profile("하츄핑", None, session) or resolve_profile("하츄핑-영어", None, session)
+
     # ── 3. voicebox.hachuping (하츄핑 프로필 웹 UI와 100% 동일 발화) ────────────
     @mcp.tool(
         name="voicebox.hachuping",
         description=(
             "Speak directly in the registered 'Hachuping' (하츄핑) profile. "
-            "100% identical to generating audio from the Voicebox web UI."
+            "If language is 'en', automatically uses the '하츄핑-영어' profile. 100% identical to web UI."
         ),
     )
     async def voicebox_hachuping(
         text: str,
+        language: str = "ko",
     ) -> dict[str, Any]:
         """Speak using the exact Hachuping profile identical to web UI."""
         db = next(get_db())
         try:
-            vp = resolve_profile("하츄핑", None, db)
+            vp = _resolve_hachuping(language, db)
             if vp is None:
                 raise ValueError(
-                    "하츄핑 프로필을 찾을 수 없습니다. Voicebox 프로필에 '하츄핑'이 등록되어 있는지 확인해주세요."
+                    "하츄핑 프로필을 찾을 수 없습니다. Voicebox 프로필에 '하츄핑' 또는 '하츄핑-영어'가 등록되어 있는지 확인해주세요."
                 )
 
             return await _speak(
@@ -233,7 +242,7 @@ def register_tools(mcp: FastMCP) -> None:
                 profile_name=vp.name,
                 text=text,
                 engine="qwen",
-                language="ko",
+                language=language,
                 personality=False,
                 instruct=None,
                 effects_chain=None,
@@ -248,21 +257,22 @@ def register_tools(mcp: FastMCP) -> None:
         name="voicebox.hachuping_generate",
         description=(
             "Generate 'Hachuping' (하츄핑) audio file exactly like web UI and WAIT until complete. "
-            "Returns audio file path and optional base64. 100% identical to web generation."
+            "If language is 'en', automatically uses '하츄핑-영어'. Returns audio file path and optional base64."
         ),
     )
     async def voicebox_hachuping_generate(
         text: str,
+        language: str = "ko",
         return_base64: bool = False,
         timeout_seconds: float = 60.0,
     ) -> dict[str, Any]:
         """Synthesize Hachuping audio exactly identical to web UI."""
         db = next(get_db())
         try:
-            vp = resolve_profile("하츄핑", None, db)
+            vp = _resolve_hachuping(language, db)
             if vp is None:
                 raise ValueError(
-                    "하츄핑 프로필을 찾을 수 없습니다. Voicebox 프로필에 '하츄핑'이 등록되어 있는지 확인해주세요."
+                    "하츄핑 프로필을 찾을 수 없습니다. Voicebox 프로필에 '하츄핑' 또는 '하츄핑-영어'가 등록되어 있는지 확인해주세요."
                 )
 
             speak_res = await _speak(
@@ -270,7 +280,7 @@ def register_tools(mcp: FastMCP) -> None:
                 profile_name=vp.name,
                 text=text,
                 engine="qwen",
-                language="ko",
+                language=language,
                 personality=False,
                 instruct=None,
                 effects_chain=None,
@@ -305,7 +315,7 @@ def register_tools(mcp: FastMCP) -> None:
             result: dict[str, Any] = {
                 "generation_id": gen_id,
                 "status": "completed",
-                "character": "하츄핑",
+                "character": vp.name,
                 "text": completed_gen.text,
                 "duration": completed_gen.duration,
                 "audio_path": audio_path,
@@ -319,6 +329,41 @@ def register_tools(mcp: FastMCP) -> None:
             return result
         finally:
             db.close()
+
+    # ── 5. voicebox.hachuping_en (하츄핑-영어 프로필 전용 발화) ───────────────
+    @mcp.tool(
+        name="voicebox.hachuping_en",
+        description=(
+            "Speak directly in English using the dedicated '하츄핑-영어' (Hachuping English) profile. "
+            "100% identical to generating English audio from the Voicebox web UI."
+        ),
+    )
+    async def voicebox_hachuping_en(
+        text: str,
+    ) -> dict[str, Any]:
+        """Speak English using the dedicated '하츄핑-영어' profile."""
+        return await voicebox_hachuping(text=text, language="en")
+
+    # ── 6. voicebox.hachuping_en_generate (하츄핑-영어 전용 파일 생성 및 대기) ────
+    @mcp.tool(
+        name="voicebox.hachuping_en_generate",
+        description=(
+            "Generate English audio file using '하츄핑-영어' (Hachuping English) profile and WAIT until complete. "
+            "Returns audio file path and optional base64. 100% identical to web generation."
+        ),
+    )
+    async def voicebox_hachuping_en_generate(
+        text: str,
+        return_base64: bool = False,
+        timeout_seconds: float = 60.0,
+    ) -> dict[str, Any]:
+        """Synthesize English Hachuping audio and block until complete."""
+        return await voicebox_hachuping_generate(
+            text=text,
+            language="en",
+            return_base64=return_base64,
+            timeout_seconds=timeout_seconds,
+        )
 
     # ── 3. voicebox.create_profile (AI Voice Profile Creator) ────────────────
     @mcp.tool(

@@ -320,6 +320,14 @@ class ApiClient {
     });
   }
 
+  async bulkDeleteGenerations(generationIds: string[]): Promise<{ deleted: number }> {
+    return this.request<{ deleted: number }>(`/history/bulk-delete`, {
+      method: 'POST',
+      body: JSON.stringify({ generation_ids: generationIds }),
+    });
+  }
+
+
   async clearFailedGenerations(): Promise<{ deleted: number }> {
     return this.request<{ deleted: number }>(`/history/failed`, {
       method: 'DELETE',

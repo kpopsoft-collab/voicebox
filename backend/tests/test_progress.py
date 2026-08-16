@@ -14,8 +14,8 @@ logging.basicConfig(
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
 )
 
-from utils.progress import ProgressManager, get_progress_manager
-from utils.hf_progress import HFProgressTracker, create_hf_progress_callback
+from backend.utils.progress import ProgressManager, get_progress_manager
+from backend.utils.hf_progress import HFProgressTracker, create_hf_progress_callback
 
 
 def test_progress_manager_basic():

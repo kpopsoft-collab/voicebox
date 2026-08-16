@@ -15,16 +15,16 @@
 
 | 도구명 | 설명 | 주요 사용 목적 |
 | :--- | :--- | :--- |
-| **`voicebox.hachuping`** | 스피커로 하츄핑 음성 즉시 실시간 재생 | 실시간 대화, 알림, 작업 완료 안내 |
-| **`voicebox.hachuping_generate`** | 오디오 합성을 완료하고 WAV 파일 경로/Base64 반환 | 오디오 파일 취득, 다운로드 링크 제공, 타 시스템 연동 |
+| **`voicebox.hachuping`** | 스피커로 하츄핑 음성 즉시 실시간 재생 (`language="en"` 전달 시 **'하츄핑-영어'** 자동 선택) | 실시간 한국어/영어 대화, 알림 |
+| **`voicebox.hachuping_generate`** | 하츄핑 오디오 파일 합성 완료 후 WAV 파일 경로/Base64 반환 | 한국어/영어 오디오 파일 취득 및 저장 |
+| **`voicebox.hachuping_en`** | **'하츄핑-영어'** 전용 프로필로 즉시 영어 발화 | 영어 실시간 대화 및 리스닝 학습 |
+| **`voicebox.hachuping_en_generate`** | **'하츄핑-영어'** 전용 프로필로 영어 오디오 파일 생성 및 대기 | 영어 오디오 파일 취득 및 저장 |
 
 ---
 
 ## 3. MCP 도구 호출 예시
 
-### 방법 1: 스피커로 즉시 말하기 (`voicebox.hachuping`)
-사용자에게 음성으로 대답하거나 알림을 줄 때 호출합니다.
-
+### 방법 1: 한국어 즉시 발화 (`voicebox.hachuping`)
 ```json
 {
   "tool": "voicebox.hachuping",
@@ -34,16 +34,25 @@
 }
 ```
 
----
+### 방법 2: 영어 전용 즉시 발화 (`voicebox.hachuping_en`)
+'하츄핑-영어' 프로필을 사용하여 영어 음성을 생성합니다.
+```json
+{
+  "tool": "voicebox.hachuping_en",
+  "arguments": {
+    "text": "Hello Doa! You did such a great job today!"
+  }
+}
+```
 
-### 방법 2: 오디오 파일 생성 및 경로 받기 (`voicebox.hachuping_generate`)
+### 방법 3: 오디오 파일 생성 및 경로 받기 (`voicebox.hachuping_generate` / `voicebox.hachuping_en_generate`)
 합성된 오디오 파일을 직접 전달받아 활용하고자 할 때 호출합니다.
 
 ```json
 {
-  "tool": "voicebox.hachuping_generate",
+  "tool": "voicebox.hachuping_en_generate",
   "arguments": {
-    "text": "안녕 도아야! 오늘 하루도 정말 수고 많았어!",
+    "text": "Welcome to Voicebox! Let's study English together!",
     "return_base64": false,
     "timeout_seconds": 60.0
   }
@@ -55,9 +64,9 @@
 {
   "generation_id": "74b76a97-add9-4abd-a8fb-320b117e7160",
   "status": "completed",
-  "character": "하츄핑",
-  "text": "안녕 도아야! 오늘 하루도 정말 수고 많았어!",
-  "duration": 1.92,
+  "character": "하츄핑-영어",
+  "text": "Welcome to Voicebox! Let's study English together!",
+  "duration": 2.35,
   "audio_path": "/Users/kykwoun/__DEV/voicebox/data/generations/74b76a97-add9-4abd-a8fb-320b117e7160.wav",
   "audio_url": "/audio/74b76a97-add9-4abd-a8fb-320b117e7160"
 }

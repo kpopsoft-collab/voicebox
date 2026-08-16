@@ -129,9 +129,18 @@ async def delete_generation(
 ):
     """Delete a generation."""
     success = await history.delete_generation(generation_id, db)
-    if not success:
-        raise HTTPException(status_code=404, detail="Generation not found")
-    return {"message": "Generation deleted successfully"}
+    return {"message": "Generation deleted successfully", "deleted": bool(success)}
+
+
+@router.post("/history/bulk-delete")
+async def bulk_delete_generations(
+    req: models.BulkDeleteRequest,
+    db: Session = Depends(get_db),
+):
+    """Bulk delete multiple generations."""
+    count = await history.delete_generations_bulk(req.generation_ids, db)
+    return {"deleted": count, "message": f"{count} generations deleted successfully"}
+
 
 
 @router.get("/history/{generation_id}/export")

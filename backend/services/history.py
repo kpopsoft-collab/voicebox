@@ -270,6 +270,49 @@ async def delete_generation(
     return True
 
 
+async def delete_generations_bulk(
+    generation_ids: list[str],
+    db: Session,
+) -> int:
+    """
+    Bulk delete multiple generations safely in a single batch.
+
+    Args:
+        generation_ids: List of generation IDs to delete
+        db: Database session
+
+    Returns:
+        Number of generations deleted
+    """
+    if not generation_ids:
+        return 0
+
+    from . import versions as versions_mod
+
+    generations = db.query(DBGeneration).filter(DBGeneration.id.in_(generation_ids)).all()
+    count = 0
+    for gen in generations:
+        try:
+            versions_mod.delete_versions_for_generation(gen.id, db)
+        except Exception:
+            pass
+
+        if gen.audio_path:
+            audio_path = config.resolve_storage_path(gen.audio_path)
+            if audio_path is not None and audio_path.exists():
+                try:
+                    audio_path.unlink()
+                except OSError:
+                    pass
+
+        db.delete(gen)
+        count += 1
+
+    db.commit()
+    return count
+
+
+
 async def delete_failed_generations(db: Session) -> int:
     """
     Delete every generation whose status is 'failed'.

@@ -14,9 +14,15 @@ logger = logging.getLogger(__name__)
 class HFProgressTracker:
     """Tracks HuggingFace Hub download progress by intercepting tqdm."""
 
-    def __init__(self, progress_callback: Optional[Callable] = None, filter_non_downloads: bool = False):
+    def __init__(
+        self,
+        progress_callback: Optional[Callable] = None,
+        filter_non_downloads: bool = False,
+        min_total_bytes: int = 0,
+    ):
         self.progress_callback = progress_callback
         self.filter_non_downloads = filter_non_downloads  # Only filter if True
+        self.min_total_bytes = min_total_bytes
         self._original_tqdm_class = None
         self._lock = threading.Lock()
         self._total_downloaded = 0
@@ -142,11 +148,10 @@ class HFProgressTracker:
                             tracker._total_size = sum(tracker._file_sizes.values())
                             tracker._total_downloaded = sum(tracker._file_downloaded.values())
 
-                            # Only report progress once we have a meaningful total (at least 1MB)
+                            # Only report progress once we have a meaningful total if min_total_bytes is set
                             # This avoids the "100% at 0MB" issue when small config
                             # files are counted before the real model files
-                            MIN_TOTAL_BYTES = 1_000_000  # 1MB
-                            if tracker._total_size < MIN_TOTAL_BYTES:
+                            if tracker.min_total_bytes > 0 and tracker._total_size < tracker.min_total_bytes:
                                 return result
 
                             # Call progress callback
@@ -301,16 +306,17 @@ class HFProgressTracker:
                             if "fetching" in desc.lower():
                                 return result
 
-                            # Skip until we have a meaningful total (at least 1MB)
+                            # Skip until we have a meaningful total if min_total_bytes is set
                             # This avoids the "100% at 0MB" issue when small config
                             # files are counted before the real model files
-                            MIN_TOTAL_BYTES = 1_000_000  # 1MB
-                            if total >= MIN_TOTAL_BYTES:
-                                tracker._total_downloaded = current
-                                tracker._total_size = total
+                            if tracker.min_total_bytes > 0 and total < tracker.min_total_bytes:
+                                return result
 
-                                if tracker.progress_callback:
-                                    tracker.progress_callback(current, total, desc)
+                            tracker._total_downloaded = current
+                            tracker._total_size = total
+
+                            if tracker.progress_callback:
+                                tracker.progress_callback(current, total, desc)
 
                         return result
 

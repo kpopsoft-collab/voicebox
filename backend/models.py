@@ -168,6 +168,13 @@ class HistoryListResponse(BaseModel):
     total: int
 
 
+class BulkDeleteRequest(BaseModel):
+    """Request model for bulk deleting generations."""
+
+    generation_ids: List[str]
+
+
+
 class TranscriptionRequest(BaseModel):
     """Request model for audio transcription."""
 

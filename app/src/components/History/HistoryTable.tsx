@@ -233,7 +233,18 @@ export function HistoryTable() {
     setIsBulkDeleting(true);
     try {
       const idsToDelete = Array.from(selectedIds);
-      await Promise.all(idsToDelete.map((id) => apiClient.deleteGeneration(id)));
+      let deletedCount = idsToDelete.length;
+      try {
+        const res = await apiClient.bulkDeleteGenerations(idsToDelete);
+        deletedCount = res.deleted ?? idsToDelete.length;
+      } catch {
+        // Fallback: chunked batch delete with allSettled to prevent single-failure abort
+        const chunkSize = 25;
+        for (let i = 0; i < idsToDelete.length; i += chunkSize) {
+          const chunk = idsToDelete.slice(i, i + chunkSize);
+          await Promise.allSettled(chunk.map((id) => apiClient.deleteGeneration(id)));
+        }
+      }
       await queryClient.invalidateQueries({ queryKey: ['history'] });
       setSelectedIds(new Set());
       setBulkDeleteDialogOpen(false);
@@ -242,8 +253,8 @@ export function HistoryTable() {
       toast({
         title: isKo ? '선택 삭제 완료' : 'Deleted selected generations',
         description: isKo
-          ? `${idsToDelete.length}개의 생성 내역이 삭제되었습니다.`
-          : `${idsToDelete.length} generations removed.`,
+          ? `${deletedCount}개의 생성 내역이 삭제되었습니다.`
+          : `${deletedCount} generations removed.`,
       });
     } catch (error) {
       toast({
