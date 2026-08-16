@@ -237,7 +237,7 @@ def register_tools(mcp: FastMCP) -> None:
                 personality=False,
                 instruct=None,
                 effects_chain=None,
-                model_size=None,
+                model_size="1.7B",
                 db=db,
             )
         finally:
@@ -274,7 +274,7 @@ def register_tools(mcp: FastMCP) -> None:
                 personality=False,
                 instruct=None,
                 effects_chain=None,
-                model_size=None,
+                model_size="1.7B",
                 db=db,
             )
 

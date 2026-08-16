@@ -8,10 +8,12 @@ import {
   MoreHorizontal,
   Play,
   RotateCcw,
+  Search,
   Square,
   Star,
   Trash2,
   Wand2,
+  X,
 } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -32,8 +34,12 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuSub,
+  DropdownMenuSubContent,
+  DropdownMenuSubTrigger,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import { Input } from '@/components/ui/input';
 import {
   Select,
   SelectContent,
@@ -174,6 +180,7 @@ export function HistoryTable() {
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [bulkDeleteDialogOpen, setBulkDeleteDialogOpen] = useState(false);
   const [isBulkDeleting, setIsBulkDeleting] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
   const { i18n } = useTranslation();
   const isKo = i18n.language?.startsWith('ko');
   const [effectsDialogOpen, setEffectsDialogOpen] = useState(false);
@@ -189,6 +196,17 @@ export function HistoryTable() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
+  const filteredHistory = allHistory.filter((gen) => {
+    if (!searchQuery.trim()) return true;
+    const q = searchQuery.toLowerCase().trim();
+    return (
+      gen.text?.toLowerCase().includes(q) ||
+      gen.profile_name?.toLowerCase().includes(q) ||
+      gen.engine?.toLowerCase().includes(q) ||
+      gen.language?.toLowerCase().includes(q)
+    );
+  });
+
   const handleToggleSelect = (id: string) => {
     setSelectedIds((prev) => {
       const next = new Set(prev);
@@ -201,12 +219,12 @@ export function HistoryTable() {
     });
   };
 
-  const isAllSelected = allHistory.length > 0 && allHistory.every((g) => selectedIds.has(g.id));
+  const isAllSelected = filteredHistory.length > 0 && filteredHistory.every((g) => selectedIds.has(g.id));
   const handleToggleSelectAll = () => {
     if (isAllSelected) {
       setSelectedIds(new Set());
     } else {
-      setSelectedIds(new Set(allHistory.map((g) => g.id)));
+      setSelectedIds(new Set(filteredHistory.map((g) => g.id)));
     }
   };
 
@@ -366,13 +384,17 @@ export function HistoryTable() {
     }
   };
 
-  const handleDownloadAudio = (generationId: string, text: string) => {
+  const handleDownloadAudio = (
+    generationId: string,
+    text: string,
+    format: 'wav' | 'mp3' = 'wav',
+  ) => {
     exportGenerationAudio.mutate(
-      { generationId, text },
+      { generationId, text, format },
       {
         onError: (error) => {
           toast({
-            title: 'Failed to download audio',
+            title: isKo ? '오디오 다운로드 실패' : 'Failed to download audio',
             description: error.message,
             variant: 'destructive',
           });
@@ -588,10 +610,10 @@ export function HistoryTable() {
         </div>
       ) : (
         <>
-          {/* Bulk Selection and Action Toolbar */}
-          {history.length > 0 && (
-            <div className="flex items-center justify-between px-3 py-2 mb-2 bg-muted/40 hover:bg-muted/60 transition-colors rounded-lg border border-border/60 text-xs shrink-0">
-              <div className="flex items-center gap-2">
+          {/* Bulk Selection and Action Toolbar with Search */}
+          {allHistory.length > 0 && (
+            <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2 px-3 py-2 mb-2 bg-muted/40 hover:bg-muted/60 transition-colors rounded-lg border border-border/60 text-xs shrink-0">
+              <div className="flex items-center gap-2 shrink-0">
                 <Checkbox
                   id="select-all-history"
                   checked={isAllSelected}
@@ -603,11 +625,34 @@ export function HistoryTable() {
                   className="cursor-pointer font-medium select-none text-foreground flex items-center gap-1 text-xs"
                 >
                   <span>{isKo ? '전체 선택' : 'Select All'}</span>
-                  <span className="text-muted-foreground text-[11px]">({history.length})</span>
+                  <span className="text-muted-foreground text-[11px]">
+                    ({filteredHistory.length !== allHistory.length ? `${filteredHistory.length}/${allHistory.length}` : allHistory.length})
+                  </span>
                 </label>
               </div>
 
-              <div className="flex items-center gap-2">
+              {/* Search Bar */}
+              <div className="flex-1 max-w-sm relative flex items-center">
+                <Search className="absolute left-2.5 h-3.5 w-3.5 text-muted-foreground pointer-events-none" />
+                <Input
+                  type="text"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  placeholder={isKo ? '대사 내용, 프로필명 검색...' : 'Search transcript, profile...'}
+                  className="h-7 pl-8 pr-7 text-xs bg-background/80 border-border/80 rounded-md focus-visible:ring-1 focus-visible:ring-accent"
+                />
+                {searchQuery && (
+                  <button
+                    type="button"
+                    onClick={() => setSearchQuery('')}
+                    className="absolute right-2 text-muted-foreground hover:text-foreground p-0.5 rounded-full hover:bg-muted cursor-pointer"
+                  >
+                    <X className="h-3 w-3" />
+                  </button>
+                )}
+              </div>
+
+              <div className="flex items-center gap-2 shrink-0 justify-end">
                 {selectedIds.size > 0 && (
                   <>
                     <span className="text-xs font-semibold text-accent">
@@ -664,7 +709,26 @@ export function HistoryTable() {
               isPlayerVisible && BOTTOM_SAFE_AREA_PADDING,
             )}
           >
-            {history.map((gen) => {
+            {filteredHistory.length === 0 && searchQuery ? (
+              <div className="text-center py-12 px-5 border-2 border-dashed my-4 border-muted rounded-md text-muted-foreground flex flex-col items-center justify-center gap-2">
+                <Search className="h-7 w-7 text-muted-foreground/50" />
+                <p className="text-sm font-medium text-foreground">
+                  {isKo ? `'${searchQuery}' 검색 결과가 없습니다.` : `No results found for '${searchQuery}'`}
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  {isKo ? '다른 검색어를 입력해 보세요.' : 'Try searching with a different term.'}
+                </p>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setSearchQuery('')}
+                  className="text-xs text-accent hover:text-accent/80 cursor-pointer mt-1"
+                >
+                  {isKo ? '검색어 초기화' : 'Clear search'}
+                </Button>
+              </div>
+            ) : (
+              filteredHistory.map((gen) => {
               const isCurrentlyPlaying = currentAudioId === gen.id && isPlaying;
               const isInProgress = gen.status === 'loading_model' || gen.status === 'generating';
               const isGenerating = isInProgress;
@@ -867,13 +931,34 @@ export function HistoryTable() {
                               <Play className="mr-2 h-4 w-4" />
                               {t('history.actions.play')}
                             </DropdownMenuItem>
-                            <DropdownMenuItem
-                              onClick={() => handleDownloadAudio(gen.id, gen.text)}
-                              disabled={exportGenerationAudio.isPending}
-                            >
-                              <Download className="mr-2 h-4 w-4" />
-                              {t('history.actions.exportAudio')}
-                            </DropdownMenuItem>
+                            <DropdownMenuSub>
+                              <DropdownMenuSubTrigger className="cursor-pointer">
+                                <Download className="mr-2 h-4 w-4" />
+                                <span>{t('history.actions.exportAudio')}</span>
+                              </DropdownMenuSubTrigger>
+                              <DropdownMenuSubContent>
+                                <DropdownMenuItem
+                                  onClick={() => handleDownloadAudio(gen.id, gen.text, 'wav')}
+                                  disabled={exportGenerationAudio.isPending}
+                                  className="cursor-pointer flex items-center justify-between"
+                                >
+                                  <span className="font-medium">WAV</span>
+                                  <span className="text-[10px] text-muted-foreground ml-3">
+                                    {isKo ? '무손실 원본 (.wav)' : 'Lossless (.wav)'}
+                                  </span>
+                                </DropdownMenuItem>
+                                <DropdownMenuItem
+                                  onClick={() => handleDownloadAudio(gen.id, gen.text, 'mp3')}
+                                  disabled={exportGenerationAudio.isPending}
+                                  className="cursor-pointer flex items-center justify-between"
+                                >
+                                  <span className="font-medium">MP3</span>
+                                  <span className="text-[10px] text-muted-foreground ml-3">
+                                    {isKo ? '고음질 압축 (.mp3)' : 'Compressed (.mp3)'}
+                                  </span>
+                                </DropdownMenuItem>
+                              </DropdownMenuSubContent>
+                            </DropdownMenuSub>
                             <DropdownMenuItem
                               onClick={() => handleExportPackage(gen.id, gen.text)}
                               disabled={exportGeneration.isPending}
@@ -964,7 +1049,8 @@ export function HistoryTable() {
                   </AnimatePresence>
                 </div>
               );
-            })}
+            })
+          )}
 
             {/* Load more trigger element */}
             {hasMore && (

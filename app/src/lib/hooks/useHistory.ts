@@ -72,8 +72,16 @@ export function useExportGenerationAudio() {
   const platform = usePlatform();
 
   return useMutation({
-    mutationFn: async ({ generationId, text }: { generationId: string; text: string }) => {
-      const blob = await apiClient.exportGenerationAudio(generationId);
+    mutationFn: async ({
+      generationId,
+      text,
+      format = 'wav',
+    }: {
+      generationId: string;
+      text: string;
+      format?: 'wav' | 'mp3';
+    }) => {
+      const blob = await apiClient.exportGenerationAudio(generationId, format);
 
       // Create safe filename from text. Append a short id so exports of
       // similarly-worded generations don't collide on the same filename
@@ -82,12 +90,13 @@ export function useExportGenerationAudio() {
         .substring(0, 30)
         .replace(/[^a-z0-9]/gi, '-')
         .toLowerCase();
-      const filename = `${safeText}-${generationId.substring(0, 8)}.wav`;
+      const ext = format.toLowerCase();
+      const filename = `${safeText || 'generation'}-${generationId.substring(0, 8)}.${ext}`;
 
       await platform.filesystem.saveFile(filename, blob, [
         {
-          name: 'Audio File',
-          extensions: ['wav'],
+          name: ext === 'mp3' ? 'MP3 Audio' : 'WAV Audio',
+          extensions: [ext],
         },
       ]);
 

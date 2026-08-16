@@ -1,8 +1,9 @@
 """Generation history endpoints."""
 
 import io
+import logging
 
-from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
+from fastapi import APIRouter, Depends, File, HTTPException, Response, UploadFile
 from fastapi.responses import FileResponse, StreamingResponse
 from sqlalchemy.orm import Session
 
@@ -10,6 +11,8 @@ from .. import config, models
 from ..services import export_import, history
 from ..app import safe_content_disposition
 from ..database import Generation as DBGeneration, VoiceProfile as DBVoiceProfile, get_db
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
@@ -165,9 +168,10 @@ async def export_generation(
 @router.get("/history/{generation_id}/export-audio")
 async def export_generation_audio(
     generation_id: str,
+    format: str = "wav",
     db: Session = Depends(get_db),
 ):
-    """Export only the audio file from a generation."""
+    """Export only the audio file from a generation in WAV or MP3 format."""
     generation = db.query(DBGeneration).filter_by(id=generation_id).first()
     if not generation:
         raise HTTPException(status_code=404, detail="Generation not found")
@@ -182,10 +186,36 @@ async def export_generation_audio(
     safe_text = "".join(c for c in generation.text[:30] if c.isalnum() or c in (" ", "-", "_")).strip()
     if not safe_text:
         safe_text = "generation"
-    # Append a short id so exports of similarly-worded generations don't collide
-    # on the same filename (the first 30 chars are frequently identical).
-    filename = f"{safe_text}-{generation_id[:8]}.wav"
 
+    # Support MP3 conversion
+    if format.lower() == "mp3":
+        try:
+            import soundfile as sf
+            data, sr = sf.read(str(audio_path), dtype="float32")
+            mp3_io = io.BytesIO()
+            sf.write(mp3_io, data, sr, format="MP3")
+            mp3_bytes = mp3_io.getvalue()
+        except Exception as e:
+            # Fallback using pydub if soundfile lacks MP3 backend on certain systems
+            try:
+                from pydub import AudioSegment
+                seg = AudioSegment.from_file(str(audio_path))
+                mp3_io = io.BytesIO()
+                seg.export(mp3_io, format="mp3", bitrate="320k")
+                mp3_bytes = mp3_io.getvalue()
+            except Exception as inner_e:
+                logger.error(f"Failed to convert WAV to MP3: {e}, fallback error: {inner_e}")
+                raise HTTPException(status_code=500, detail=f"MP3 conversion failed: {e}")
+
+        filename = f"{safe_text}-{generation_id[:8]}.mp3"
+        return Response(
+            content=mp3_bytes,
+            media_type="audio/mpeg",
+            headers={"Content-Disposition": safe_content_disposition("attachment", filename)},
+        )
+
+    # Default WAV export
+    filename = f"{safe_text}-{generation_id[:8]}.wav"
     return FileResponse(
         audio_path,
         media_type="audio/wav",

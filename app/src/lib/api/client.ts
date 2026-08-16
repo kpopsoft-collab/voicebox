@@ -340,8 +340,8 @@ class ApiClient {
     return response.blob();
   }
 
-  async exportGenerationAudio(generationId: string): Promise<Blob> {
-    const url = `${this.getBaseUrl()}/history/${generationId}/export-audio`;
+  async exportGenerationAudio(generationId: string, format: 'wav' | 'mp3' = 'wav'): Promise<Blob> {
+    const url = `${this.getBaseUrl()}/history/${generationId}/export-audio?format=${format}`;
     const response = await fetch(url);
 
     if (!response.ok) {
