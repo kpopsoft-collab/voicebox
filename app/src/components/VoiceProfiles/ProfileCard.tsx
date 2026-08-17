@@ -13,7 +13,6 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { apiClient } from '@/lib/api/client';
 import type { VoiceProfileResponse } from '@/lib/api/types';
 import { useDeleteProfile, useExportProfile } from '@/lib/hooks/useProfiles';
 import { cn } from '@/lib/utils/cn';
@@ -57,24 +56,12 @@ export function ProfileCard({ profile, disabled }: ProfileCardProps) {
       (async () => {
         try {
           const serverUrl = useServerStore.getState().serverUrl;
-          if (profile.voice_type === 'preset' && profile.preset_engine && profile.preset_voice_id) {
-            setAudioWithAutoPlay(
-              `${serverUrl}/profiles/presets/${profile.preset_engine}/${profile.preset_voice_id}/preview`,
-              profile.id,
-              profile.id,
-              profile.name,
-            );
-          } else if (profile.sample_count > 0) {
-            const samples = await apiClient.listProfileSamples(profile.id);
-            if (samples.length > 0) {
-              setAudioWithAutoPlay(
-                `${serverUrl}${samples[0].audio_path}`,
-                samples[0].id,
-                profile.id,
-                profile.name,
-              );
-            }
-          }
+          setAudioWithAutoPlay(
+            `${serverUrl}/profiles/${profile.id}/preview`,
+            profile.id,
+            profile.id,
+            profile.name,
+          );
         } catch (e) {
           console.error('Failed to play preview:', e);
         }
