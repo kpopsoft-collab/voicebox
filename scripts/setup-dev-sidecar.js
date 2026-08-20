@@ -26,7 +26,16 @@ const MIN_REAL_BINARY_SIZE = 10000;
 // Get the current platform's target triple
 function getTargetTriple() {
   try {
-    const triple = execSync('rustc --print host-tuple', { encoding: 'utf-8' }).trim();
+    // `execSync` bubbles the spawned process's stderr to the parent when
+    // stdio is inherited. We swallow it here — the only callers of this
+    // function are dev-mode helpers, and on a machine without Rust the
+    // "rustc: command not found" message is noise. `setup:dev` is run
+    // even on machines that won't actually invoke Tauri (e.g. contributors
+    // doing browser-only dev via `bun run dev:web`).
+    const triple = execSync('rustc --print host-tuple', {
+      encoding: 'utf-8',
+      stdio: ['ignore', 'pipe', 'ignore'],
+    }).trim();
     return triple;
   } catch {
     // Fallback detection

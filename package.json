@@ -9,7 +9,7 @@
     "landing"
   ],
   "scripts": {
-    "dev": "bun run setup:dev && cd tauri && bun run tauri dev",
+    "dev": "bun run setup:dev && bun run scripts/dev-with-rust-check.js",
     "dev:web": "cd web && bun run dev",
     "dev:landing": "cd landing && bun run dev",
     "dev:server": "uvicorn backend.main:app --reload --port 17493",
