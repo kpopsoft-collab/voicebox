@@ -121,6 +121,8 @@ def build_server(cuda=False, rocm=False):
             "--hidden-import",
             "backend.backends.qwen_custom_voice_backend",
             "--hidden-import",
+            "backend.backends.stable_audio_3_backend",
+            "--hidden-import",
             "backend.utils.audio",
             "--hidden-import",
             "backend.utils.cache",
@@ -327,6 +329,23 @@ def build_server(cuda=False, rocm=False):
             "mcp",
             "--hidden-import",
             "sse_starlette",
+            "--collect-all",
+            "stable_audio_3",
+            "--hidden-import",
+            "einops",
+            "--hidden-import",
+            "safetensors",
+            # Stable Audio 3 + qwen readers depend on these metadata files at
+            # runtime; PyInstaller's module-table analysis otherwise misses
+            # package versions referenced via importlib.metadata.
+            "--copy-metadata",
+            "safetensors",
+            "--copy-metadata",
+            "huggingface_hub",
+            "--copy-metadata",
+            "transformers",
+            "--copy-metadata",
+            "einops",
         ]
     )
 

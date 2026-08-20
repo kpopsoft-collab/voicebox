@@ -4,6 +4,7 @@ import {
   Code2,
   Copy,
   Download,
+  MessageSquareText,
   Network,
   Play,
   Plug,
@@ -37,6 +38,7 @@ import { cn } from '@/lib/utils/cn';
 import { formatDate } from '@/lib/utils/format';
 import { usePlayerStore } from '@/stores/playerStore';
 import { useServerStore } from '@/stores/serverStore';
+import { AIPromptCard } from '@/components/MCPTab/AIPromptCard';
 
 interface ToolDoc {
   name: string;
@@ -65,10 +67,23 @@ const MCP_TOOLS: ToolDoc[] = [
       '하츄핑 음성 프로필로 텍스트를 즉시 스피커로 발화합니다. language="en" 전달 시 "하츄핑-영어" 프로필이 자동 적용됩니다.',
     parameters: [
       { name: 'text', type: 'string', required: true, description: '말할 대사 내용 (한국어/영어)' },
-      { name: 'language', type: 'string', required: false, description: '"ko" (한국어) 또는 "en" (영어)', default: '"ko"' },
-      { name: 'personality', type: 'boolean', required: false, description: '캐릭터 성격 반영 여부', default: 'true' },
+      {
+        name: 'language',
+        type: 'string',
+        required: false,
+        description: '"ko" (한국어) 또는 "en" (영어)',
+        default: '"ko"',
+      },
+      {
+        name: 'personality',
+        type: 'boolean',
+        required: false,
+        description: '캐릭터 성격 반영 여부',
+        default: 'true',
+      },
     ],
-    returns: '{"generation_id": string, "status": "completed", "character": "하츄핑", "duration": float, "audio_url": string}',
+    returns:
+      '{"generation_id": string, "status": "completed", "character": "하츄핑", "duration": float, "audio_url": string}',
     exampleCall: {
       tool: 'voicebox.hachuping',
       arguments: {
@@ -94,11 +109,30 @@ const MCP_TOOLS: ToolDoc[] = [
       '하츄핑 음성을 합성하고 완료될 때까지 대기한 후, 로컬 WAV 파일 경로 및 오디오 정보를 반환합니다.',
     parameters: [
       { name: 'text', type: 'string', required: true, description: '합성할 텍스트' },
-      { name: 'language', type: 'string', required: false, description: '"ko" 또는 "en"', default: '"ko"' },
-      { name: 'return_base64', type: 'boolean', required: false, description: 'Base64 오디오 데이터 포함 여부', default: 'false' },
-      { name: 'timeout_seconds', type: 'number', required: false, description: '합성 타임아웃 (초)', default: '60.0' },
+      {
+        name: 'language',
+        type: 'string',
+        required: false,
+        description: '"ko" 또는 "en"',
+        default: '"ko"',
+      },
+      {
+        name: 'return_base64',
+        type: 'boolean',
+        required: false,
+        description: 'Base64 오디오 데이터 포함 여부',
+        default: 'false',
+      },
+      {
+        name: 'timeout_seconds',
+        type: 'number',
+        required: false,
+        description: '합성 타임아웃 (초)',
+        default: '60.0',
+      },
     ],
-    returns: '{"generation_id": string, "audio_path": string, "audio_url": string, "duration": float, "status": "completed"}',
+    returns:
+      '{"generation_id": string, "audio_path": string, "audio_url": string, "duration": float, "status": "completed"}',
     exampleCall: {
       tool: 'voicebox.hachuping_generate',
       arguments: {
@@ -113,7 +147,8 @@ const MCP_TOOLS: ToolDoc[] = [
       status: 'completed',
       character: '하츄핑',
       duration: 1.84,
-      audio_path: '/Users/kykwoun/__DEV/voicebox/data/generations/8f921ab3-4411-42cb-b1b4-49c049e7b231.wav',
+      audio_path:
+        '/Users/kykwoun/__DEV/voicebox/data/generations/8f921ab3-4411-42cb-b1b4-49c049e7b231.wav',
       audio_url: '/audio/8f921ab3-4411-42cb-b1b4-49c049e7b231',
     },
   },
@@ -126,11 +161,12 @@ const MCP_TOOLS: ToolDoc[] = [
     parameters: [
       { name: 'text', type: 'string', required: true, description: 'English text to speak' },
     ],
-    returns: '{"generation_id": string, "status": "completed", "character": "하츄핑-영어", "duration": float}',
+    returns:
+      '{"generation_id": string, "status": "completed", "character": "하츄핑-영어", "duration": float}',
     exampleCall: {
       tool: 'voicebox.hachuping_en',
       arguments: {
-        text: 'Hello Doa! Welcome to Voicebox, let\'s study English together!',
+        text: "Hello Doa! Welcome to Voicebox, let's study English together!",
       },
     },
     exampleResponse: {
@@ -149,10 +185,23 @@ const MCP_TOOLS: ToolDoc[] = [
       '"하츄핑-영어" 전용 프로필로 영어 음성을 합성하고 완료 시 로컬 WAV 경로를 반환합니다.',
     parameters: [
       { name: 'text', type: 'string', required: true, description: 'English text to synthesize' },
-      { name: 'return_base64', type: 'boolean', required: false, description: 'Include Base64 binary', default: 'false' },
-      { name: 'timeout_seconds', type: 'number', required: false, description: 'Timeout in seconds', default: '60.0' },
+      {
+        name: 'return_base64',
+        type: 'boolean',
+        required: false,
+        description: 'Include Base64 binary',
+        default: 'false',
+      },
+      {
+        name: 'timeout_seconds',
+        type: 'number',
+        required: false,
+        description: 'Timeout in seconds',
+        default: '60.0',
+      },
     ],
-    returns: '{"generation_id": string, "audio_path": string, "duration": float, "status": "completed"}',
+    returns:
+      '{"generation_id": string, "audio_path": string, "duration": float, "status": "completed"}',
     exampleCall: {
       tool: 'voicebox.hachuping_en_generate',
       arguments: {
@@ -165,7 +214,8 @@ const MCP_TOOLS: ToolDoc[] = [
       status: 'completed',
       character: '하츄핑-영어',
       duration: 2.21,
-      audio_path: '/Users/kykwoun/__DEV/voicebox/data/generations/e49911da-2780-496a-912e-a59ffc129e01.wav',
+      audio_path:
+        '/Users/kykwoun/__DEV/voicebox/data/generations/e49911da-2780-496a-912e-a59ffc129e01.wav',
     },
   },
 
@@ -178,13 +228,44 @@ const MCP_TOOLS: ToolDoc[] = [
       '지정한 보이스 프로필 또는 기본 음성으로 텍스트를 합성하고 파일 생성이 완료될 때까지 대기 후 경로를 반환합니다.',
     parameters: [
       { name: 'text', type: 'string', required: true, description: '합성할 텍스트' },
-      { name: 'profile', type: 'string', required: false, description: '프로필 이름 또는 ID (생략 시 기본 음성)', default: '기본값' },
-      { name: 'language', type: 'string', required: false, description: '언어 코드 ("ko", "en", "ja", "zh" 등)', default: '"ko"' },
-      { name: 'engine', type: 'string', required: false, description: 'TTS 엔진 ("qwen", "chatterbox", "f5tts")', default: 'auto' },
-      { name: 'personality', type: 'boolean', required: false, description: '캐릭터 성격 반영 여부', default: 'false' },
-      { name: 'timeout_seconds', type: 'number', required: false, description: '최대 대기 시간', default: '60.0' },
+      {
+        name: 'profile',
+        type: 'string',
+        required: false,
+        description: '프로필 이름 또는 ID (생략 시 기본 음성)',
+        default: '기본값',
+      },
+      {
+        name: 'language',
+        type: 'string',
+        required: false,
+        description: '언어 코드 ("ko", "en", "ja", "zh" 등)',
+        default: '"ko"',
+      },
+      {
+        name: 'engine',
+        type: 'string',
+        required: false,
+        description: 'TTS 엔진 ("qwen", "chatterbox", "f5tts")',
+        default: 'auto',
+      },
+      {
+        name: 'personality',
+        type: 'boolean',
+        required: false,
+        description: '캐릭터 성격 반영 여부',
+        default: 'false',
+      },
+      {
+        name: 'timeout_seconds',
+        type: 'number',
+        required: false,
+        description: '최대 대기 시간',
+        default: '60.0',
+      },
     ],
-    returns: '{"generation_id": string, "audio_path": string, "duration": float, "status": "completed"}',
+    returns:
+      '{"generation_id": string, "audio_path": string, "duration": float, "status": "completed"}',
     exampleCall: {
       tool: 'voicebox.generate_audio',
       arguments: {
@@ -197,7 +278,8 @@ const MCP_TOOLS: ToolDoc[] = [
       generation_id: '3a4b5c6d-7e8f-9012-3456-789abcdef012',
       status: 'completed',
       duration: 3.42,
-      audio_path: '/Users/kykwoun/__DEV/voicebox/data/generations/3a4b5c6d-7e8f-9012-3456-789abcdef012.wav',
+      audio_path:
+        '/Users/kykwoun/__DEV/voicebox/data/generations/3a4b5c6d-7e8f-9012-3456-789abcdef012.wav',
     },
   },
   {
@@ -209,8 +291,20 @@ const MCP_TOOLS: ToolDoc[] = [
     parameters: [
       { name: 'text', type: 'string', required: true, description: '발화할 텍스트' },
       { name: 'profile', type: 'string', required: false, description: '프로필 이름/ID' },
-      { name: 'language', type: 'string', required: false, description: '언어 코드', default: '"ko"' },
-      { name: 'personality', type: 'boolean', required: false, description: '성격 반영 여부', default: 'false' },
+      {
+        name: 'language',
+        type: 'string',
+        required: false,
+        description: '언어 코드',
+        default: '"ko"',
+      },
+      {
+        name: 'personality',
+        type: 'boolean',
+        required: false,
+        description: '성격 반영 여부',
+        default: 'false',
+      },
     ],
     returns: '{"generation_id": string, "status": "generating", "profile": string}',
     exampleCall: {
@@ -233,7 +327,12 @@ const MCP_TOOLS: ToolDoc[] = [
     description:
       'Demucs AI 모델을 활용해 오디오 파일에서 배경음악(BGM)을 깨끗이 제거하고 목소리만 분리합니다.',
     parameters: [
-      { name: 'audio_path', type: 'string', required: true, description: '배경음을 제거할 로컬 오디오 파일 절대 경로' },
+      {
+        name: 'audio_path',
+        type: 'string',
+        required: true,
+        description: '배경음을 제거할 로컬 오디오 파일 절대 경로',
+      },
     ],
     returns: '{"status": "completed", "clean_vocal_path": string, "original_path": string}',
     exampleCall: {
@@ -284,8 +383,18 @@ const MCP_TOOLS: ToolDoc[] = [
       '로컬 Whisper 신경망을 사용하여 오디오 파일 또는 Base64 데이터를 한국어/영어로 신속하게 텍스트 변환합니다.',
     parameters: [
       { name: 'audio_path', type: 'string', required: false, description: '로컬 오디오 파일 경로' },
-      { name: 'audio_base64', type: 'string', required: false, description: 'Base64 인코딩 오디오 데이터' },
-      { name: 'language', type: 'string', required: false, description: '언어 힌트 ("ko", "en" 등)' },
+      {
+        name: 'audio_base64',
+        type: 'string',
+        required: false,
+        description: 'Base64 인코딩 오디오 데이터',
+      },
+      {
+        name: 'language',
+        type: 'string',
+        required: false,
+        description: '언어 힌트 ("ko", "en" 등)',
+      },
     ],
     returns: '{"text": string, "language": string, "duration": float}',
     exampleCall: {
@@ -308,9 +417,25 @@ const MCP_TOOLS: ToolDoc[] = [
     description:
       '참조 오디오 샘플과 화자 이름을 입력받아 즉시 목소리를 복제하고 새로운 Voice Profile로 등록합니다.',
     parameters: [
-      { name: 'name', type: 'string', required: true, description: '프로필 이름 (예: "도아", "내 목소리")' },
-      { name: 'audio_path', type: 'string', required: true, description: '10~30초 분량의 참조 음성 파일 경로' },
-      { name: 'language', type: 'string', required: false, description: '주 언어 ("ko", "en")', default: '"ko"' },
+      {
+        name: 'name',
+        type: 'string',
+        required: true,
+        description: '프로필 이름 (예: "도아", "내 목소리")',
+      },
+      {
+        name: 'audio_path',
+        type: 'string',
+        required: true,
+        description: '10~30초 분량의 참조 음성 파일 경로',
+      },
+      {
+        name: 'language',
+        type: 'string',
+        required: false,
+        description: '주 언어 ("ko", "en")',
+        default: '"ko"',
+      },
       { name: 'personality', type: 'string', required: false, description: '성격/말투 묘사' },
     ],
     returns: '{"id": string, "name": string, "language": string, "status": "active"}',
@@ -335,10 +460,10 @@ const MCP_TOOLS: ToolDoc[] = [
     name: 'voicebox.list_profiles',
     category: 'profile_stt',
     badge: '등록 프로필 목록 조회',
-    description:
-      '현재 Voicebox에 등록된 모든 클론 음성 및 프리셋 프로필 목록을 조회합니다.',
+    description: '현재 Voicebox에 등록된 모든 클론 음성 및 프리셋 프로필 목록을 조회합니다.',
     parameters: [],
-    returns: 'Array<{"id": string, "name": string, "language": string, "voice_type": string, "personality": string}>',
+    returns:
+      'Array<{"id": string, "name": string, "language": string, "voice_type": string, "personality": string}>',
     exampleCall: {
       tool: 'voicebox.list_profiles',
       arguments: {},
@@ -356,7 +481,8 @@ const MCP_TOOLS: ToolDoc[] = [
     description:
       '로컬 서버의 하드웨어 가속(Apple Silicon M3 Ultra Metal), 활성 모델, 큐 상태를 반환합니다.',
     parameters: [],
-    returns: '{"status": "online", "hardware": "Apple Silicon (Metal)", "active_models": Array<string>}',
+    returns:
+      '{"status": "online", "hardware": "Apple Silicon (Metal)", "active_models": Array<string>}',
     exampleCall: {
       tool: 'voicebox.get_status',
       arguments: {},
@@ -380,6 +506,7 @@ export function MCPTab() {
   const { settings: captureSettings, update: updateCapture } = useCaptureSettings();
 
   const [copiedKey, setCopiedKey] = useState<string | null>(null);
+  const [activeTab, setActiveTab] = useState<string>('connect');
 
   // Playground States
   const [selectedTool, setSelectedTool] = useState<string>('voicebox.hachuping');
@@ -519,7 +646,12 @@ export function MCPTab() {
       setPlaygroundResult(resultData);
       if (audioLink) {
         setPlaygroundAudioUrl(audioLink);
-        setAudioWithAutoPlay(audioLink, generationId, null, `${targetCharacter}: ${playgroundText.slice(0, 20)}...`);
+        setAudioWithAutoPlay(
+          audioLink,
+          generationId,
+          null,
+          `${targetCharacter}: ${playgroundText.slice(0, 20)}...`,
+        );
       }
 
       toast({
@@ -551,13 +683,17 @@ export function MCPTab() {
             <div>
               <h1 className="text-2xl font-bold tracking-tight text-foreground flex items-center gap-2.5">
                 Model Context Protocol (MCP)
-                <Badge variant="outline" className="bg-emerald-500/10 text-emerald-400 border-emerald-500/30 text-xs font-medium py-0.5">
+                <Badge
+                  variant="outline"
+                  className="bg-emerald-500/10 text-emerald-400 border-emerald-500/30 text-xs font-medium py-0.5"
+                >
                   <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 mr-1.5 animate-pulse" />
                   Live & Active
                 </Badge>
               </h1>
               <p className="text-xs text-muted-foreground mt-0.5">
-                Claude Code, Antigravity, Cursor, Windsurf 등 모든 AI 에이전트와 로컬 Voicebox를 즉시 연결하는 초고속 음성 인터페이스
+                Claude Code, Antigravity, Cursor, Windsurf 등 모든 AI 에이전트와 로컬 Voicebox를
+                즉시 연결하는 초고속 음성 인터페이스
               </p>
             </div>
           </div>
@@ -574,15 +710,19 @@ export function MCPTab() {
             className="h-8 gap-1.5 text-xs"
             onClick={() => copyToClipboard(mcpUrl, 'top-mcp-url')}
           >
-            {copiedKey === 'top-mcp-url' ? <Check className="h-3.5 w-3.5 text-emerald-500" /> : <Copy className="h-3.5 w-3.5" />}
+            {copiedKey === 'top-mcp-url' ? (
+              <Check className="h-3.5 w-3.5 text-emerald-500" />
+            ) : (
+              <Copy className="h-3.5 w-3.5" />
+            )}
             URL 복사
           </Button>
         </div>
       </div>
 
       {/* ── Main Tabbed Navigation ── */}
-      <Tabs defaultValue="connect" className="w-full space-y-6">
-        <TabsList className="grid grid-cols-4 max-w-2xl bg-muted/60 p-1 border border-border/50">
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full space-y-6">
+        <TabsList className="grid grid-cols-5 max-w-4xl bg-muted/60 p-1 border border-border/50">
           <TabsTrigger value="connect" className="gap-2 text-xs">
             <Zap className="h-3.5 w-3.5" />
             연동 설정
@@ -599,6 +739,10 @@ export function MCPTab() {
             <Plug className="h-3.5 w-3.5" />
             클라이언트 바인딩
           </TabsTrigger>
+          <TabsTrigger value="ai-prompt" className="gap-2 text-xs">
+            <MessageSquareText className="h-3.5 w-3.5" />
+            AI 프롬프트
+          </TabsTrigger>
         </TabsList>
 
         {/* ══════════════════════════════════════════════════════════════ */}
@@ -614,15 +758,18 @@ export function MCPTab() {
                     <Terminal className="h-5 w-5 text-amber-500" />
                     <CardTitle className="text-base font-semibold">Claude Code (CLI)</CardTitle>
                   </div>
-                  <Badge variant="secondary" className="text-[11px]">터미널 1초 등록</Badge>
+                  <Badge variant="secondary" className="text-xs">
+                    터미널 1초 등록
+                  </Badge>
                 </div>
                 <CardDescription className="text-xs">
-                  터미널에서 아래 명령어를 1회 실행하면 Claude Code에 Voicebox 도구가 자동 등록됩니다.
+                  터미널에서 아래 명령어를 1회 실행하면 Claude Code에 Voicebox 도구가 자동
+                  등록됩니다.
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-3">
                 <div className="relative">
-                  <pre className="text-xs font-mono p-3 rounded-lg bg-black/40 border border-white/5 overflow-x-auto text-emerald-400">
+                  <pre className="text-xs font-mono p-3 rounded-lg bg-[#0f172a] border border-white/5 overflow-x-auto text-emerald-400">
                     {`claude mcp add voicebox \\\n  --transport http \\\n  --url ${mcpUrl} \\\n  --header "X-Voicebox-Client-Id: claude-code"`}
                   </pre>
                   <Button
@@ -636,7 +783,11 @@ export function MCPTab() {
                       )
                     }
                   >
-                    {copiedKey === 'claude-code-cli' ? <Check className="h-3.5 w-3.5 text-emerald-400" /> : <Copy className="h-3.5 w-3.5" />}
+                    {copiedKey === 'claude-code-cli' ? (
+                      <Check className="h-3.5 w-3.5 text-emerald-400" />
+                    ) : (
+                      <Copy className="h-3.5 w-3.5" />
+                    )}
                   </Button>
                 </div>
               </CardContent>
@@ -648,9 +799,13 @@ export function MCPTab() {
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
                     <Sparkles className="h-5 w-5 text-blue-400" />
-                    <CardTitle className="text-base font-semibold">Antigravity / Gemini IDE</CardTitle>
+                    <CardTitle className="text-base font-semibold">
+                      Antigravity / Gemini IDE
+                    </CardTitle>
                   </div>
-                  <Badge variant="secondary" className="text-[11px]">mcp.json 연동</Badge>
+                  <Badge variant="secondary" className="text-xs">
+                    mcp.json 연동
+                  </Badge>
                 </div>
                 <CardDescription className="text-xs">
                   프로젝트 루트의 <code>mcp.json</code> 또는 전역 설정 파일에 추가합니다.
@@ -658,7 +813,7 @@ export function MCPTab() {
               </CardHeader>
               <CardContent className="space-y-3">
                 <div className="relative">
-                  <pre className="text-xs font-mono p-3 rounded-lg bg-black/40 border border-white/5 overflow-x-auto text-sky-300">
+                  <pre className="text-xs font-mono p-3 rounded-lg bg-[#0f172a] border border-white/5 overflow-x-auto text-sky-300">
                     {JSON.stringify(
                       {
                         mcpServers: {
@@ -694,7 +849,11 @@ export function MCPTab() {
                       )
                     }
                   >
-                    {copiedKey === 'antigravity-json' ? <Check className="h-3.5 w-3.5 text-emerald-400" /> : <Copy className="h-3.5 w-3.5" />}
+                    {copiedKey === 'antigravity-json' ? (
+                      <Check className="h-3.5 w-3.5 text-emerald-400" />
+                    ) : (
+                      <Copy className="h-3.5 w-3.5" />
+                    )}
                   </Button>
                 </div>
               </CardContent>
@@ -708,15 +867,18 @@ export function MCPTab() {
                     <Bot className="h-5 w-5 text-orange-400" />
                     <CardTitle className="text-base font-semibold">Claude Desktop App</CardTitle>
                   </div>
-                  <Badge variant="secondary" className="text-[11px]">데스크톱 설정</Badge>
+                  <Badge variant="secondary" className="text-xs">
+                    데스크톱 설정
+                  </Badge>
                 </div>
                 <CardDescription className="text-xs">
-                  <code>claude_desktop_config.json</code> 파일의 <code>mcpServers</code> 섹션에 등록합니다.
+                  <code>claude_desktop_config.json</code> 파일의 <code>mcpServers</code> 섹션에
+                  등록합니다.
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-3">
                 <div className="relative">
-                  <pre className="text-xs font-mono p-3 rounded-lg bg-black/40 border border-white/5 overflow-x-auto text-orange-300">
+                  <pre className="text-xs font-mono p-3 rounded-lg bg-[#0f172a] border border-white/5 overflow-x-auto text-orange-300">
                     {JSON.stringify(
                       {
                         mcpServers: {
@@ -752,7 +914,11 @@ export function MCPTab() {
                       )
                     }
                   >
-                    {copiedKey === 'claude-desktop-json' ? <Check className="h-3.5 w-3.5 text-emerald-400" /> : <Copy className="h-3.5 w-3.5" />}
+                    {copiedKey === 'claude-desktop-json' ? (
+                      <Check className="h-3.5 w-3.5 text-emerald-400" />
+                    ) : (
+                      <Copy className="h-3.5 w-3.5" />
+                    )}
                   </Button>
                 </div>
               </CardContent>
@@ -764,9 +930,13 @@ export function MCPTab() {
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
                     <Code2 className="h-5 w-5 text-violet-400" />
-                    <CardTitle className="text-base font-semibold">Direct REST API (cURL / Python)</CardTitle>
+                    <CardTitle className="text-base font-semibold">
+                      Direct REST API (cURL / Python)
+                    </CardTitle>
                   </div>
-                  <Badge variant="secondary" className="text-[11px]">비MCP 클라이언트</Badge>
+                  <Badge variant="secondary" className="text-xs">
+                    비MCP 클라이언트
+                  </Badge>
                 </div>
                 <CardDescription className="text-xs">
                   MCP를 지원하지 않는 쉘 스크립트나 커스텀 앱에서 직접 HTTP POST로 호출합니다.
@@ -774,7 +944,7 @@ export function MCPTab() {
               </CardHeader>
               <CardContent className="space-y-3">
                 <div className="relative">
-                  <pre className="text-xs font-mono p-3 rounded-lg bg-black/40 border border-white/5 overflow-x-auto text-violet-300">
+                  <pre className="text-xs font-mono p-3 rounded-lg bg-[#0f172a] border border-white/5 overflow-x-auto text-violet-300">
                     {`curl -k -X POST ${serverUrl}/speak \\\n  -H "Content-Type: application/json" \\\n  -d '{"text": "안녕하세요!", "profile": "하츄핑", "language": "ko"}'`}
                   </pre>
                   <Button
@@ -788,7 +958,11 @@ export function MCPTab() {
                       )
                     }
                   >
-                    {copiedKey === 'curl-speak' ? <Check className="h-3.5 w-3.5 text-emerald-400" /> : <Copy className="h-3.5 w-3.5" />}
+                    {copiedKey === 'curl-speak' ? (
+                      <Check className="h-3.5 w-3.5 text-emerald-400" />
+                    ) : (
+                      <Copy className="h-3.5 w-3.5" />
+                    )}
                   </Button>
                 </div>
               </CardContent>
@@ -810,7 +984,7 @@ export function MCPTab() {
                         {tool.name}
                       </code>
                       {tool.badge && (
-                        <Badge variant="secondary" className="text-[11px] font-normal">
+                        <Badge variant="secondary" className="text-xs font-normal">
                           {tool.badge}
                         </Badge>
                       )}
@@ -819,10 +993,14 @@ export function MCPTab() {
                       variant="outline"
                       className={cn(
                         'text-[10px] uppercase tracking-wider',
-                        tool.category === 'hachuping' && 'text-pink-400 border-pink-500/30 bg-pink-500/10',
-                        tool.category === 'synthesis' && 'text-blue-400 border-blue-500/30 bg-blue-500/10',
-                        tool.category === 'audio' && 'text-amber-400 border-amber-500/30 bg-amber-500/10',
-                        tool.category === 'profile_stt' && 'text-emerald-400 border-emerald-500/30 bg-emerald-500/10',
+                        tool.category === 'hachuping' &&
+                          'text-pink-400 border-pink-500/30 bg-pink-500/10',
+                        tool.category === 'synthesis' &&
+                          'text-blue-400 border-blue-500/30 bg-blue-500/10',
+                        tool.category === 'audio' &&
+                          'text-amber-400 border-amber-500/30 bg-amber-500/10',
+                        tool.category === 'profile_stt' &&
+                          'text-emerald-400 border-emerald-500/30 bg-emerald-500/10',
                       )}
                     >
                       {tool.category}
@@ -837,12 +1015,12 @@ export function MCPTab() {
                   {/* Parameter List */}
                   {tool.parameters.length > 0 && (
                     <div className="space-y-1.5">
-                      <div className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+                      <div className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
                         매개변수 (Parameters)
                       </div>
                       <div className="rounded-lg border border-border/60 overflow-hidden text-xs">
                         <table className="w-full divide-y divide-border/60">
-                          <thead className="bg-muted/40 text-muted-foreground text-[11px]">
+                          <thead className="bg-muted/40 text-muted-foreground text-xs">
                             <tr>
                               <th className="py-1.5 px-3 text-left font-medium">이름</th>
                               <th className="py-1.5 px-3 text-left font-medium">타입</th>
@@ -851,7 +1029,7 @@ export function MCPTab() {
                               <th className="py-1.5 px-3 text-left font-medium">기본값</th>
                             </tr>
                           </thead>
-                          <tbody className="divide-y divide-border/40 font-mono text-[11px]">
+                          <tbody className="divide-y divide-border/40 font-mono text-xs">
                             {tool.parameters.map((p) => (
                               <tr key={p.name} className="hover:bg-muted/20">
                                 <td className="py-1.5 px-3 text-accent font-semibold">{p.name}</td>
@@ -860,11 +1038,15 @@ export function MCPTab() {
                                   {p.required ? (
                                     <span className="text-rose-400 font-semibold">필수</span>
                                   ) : (
-                                    <span className="text-muted-foreground/70">선택</span>
+                                    <span className="text-muted-foreground">선택</span>
                                   )}
                                 </td>
-                                <td className="py-1.5 px-3 font-sans text-foreground/90">{p.description}</td>
-                                <td className="py-1.5 px-3 text-muted-foreground/80">{p.default ?? '-'}</td>
+                                <td className="py-1.5 px-3 font-sans text-foreground/90">
+                                  {p.description}
+                                </td>
+                                <td className="py-1.5 px-3 text-muted-foreground">
+                                  {p.default ?? '-'}
+                                </td>
                               </tr>
                             ))}
                           </tbody>
@@ -876,25 +1058,38 @@ export function MCPTab() {
                   {/* JSON Call Example */}
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-3 pt-1">
                     <div className="space-y-1">
-                      <div className="text-[11px] font-semibold text-muted-foreground">호출 예시 (MCP Request)</div>
+                      <div className="text-xs font-semibold text-muted-foreground">
+                        호출 예시 (MCP Request)
+                      </div>
                       <div className="relative">
-                        <pre className="text-[11px] font-mono p-2.5 rounded bg-black/30 border border-white/5 overflow-x-auto text-sky-300">
+                        <pre className="text-xs font-mono p-2.5 rounded bg-[#0f172a] border border-white/5 overflow-x-auto text-sky-300">
                           {JSON.stringify(tool.exampleCall, null, 2)}
                         </pre>
                         <Button
                           size="sm"
                           variant="ghost"
                           className="absolute top-1 right-1 h-6 px-1.5 text-[10px]"
-                          onClick={() => copyToClipboard(JSON.stringify(tool.exampleCall, null, 2), `req-${tool.name}`)}
+                          onClick={() =>
+                            copyToClipboard(
+                              JSON.stringify(tool.exampleCall, null, 2),
+                              `req-${tool.name}`,
+                            )
+                          }
                         >
-                          {copiedKey === `req-${tool.name}` ? <Check className="h-3 w-3 text-emerald-400" /> : <Copy className="h-3 w-3" />}
+                          {copiedKey === `req-${tool.name}` ? (
+                            <Check className="h-3 w-3 text-emerald-400" />
+                          ) : (
+                            <Copy className="h-3 w-3" />
+                          )}
                         </Button>
                       </div>
                     </div>
 
                     <div className="space-y-1">
-                      <div className="text-[11px] font-semibold text-muted-foreground">응답 예시 (Response)</div>
-                      <pre className="text-[11px] font-mono p-2.5 rounded bg-black/30 border border-white/5 overflow-x-auto text-emerald-300">
+                      <div className="text-xs font-semibold text-muted-foreground">
+                        응답 예시 (Response)
+                      </div>
+                      <pre className="text-xs font-mono p-2.5 rounded bg-[#0f172a] border border-white/5 overflow-x-auto text-emerald-300">
                         {JSON.stringify(tool.exampleResponse, null, 2)}
                       </pre>
                     </div>
@@ -924,33 +1119,47 @@ export function MCPTab() {
                     </Badge>
                   </div>
                   <CardDescription className="text-xs">
-                    웹 브라우저에서 직접 파라미터를 입력하고 MCP 도구를 즉시 실행하여 결과를 확인합니다.
+                    웹 브라우저에서 직접 파라미터를 입력하고 MCP 도구를 즉시 실행하여 결과를
+                    확인합니다.
                   </CardDescription>
                 </CardHeader>
 
                 <CardContent className="space-y-4">
                   {/* Select Tool */}
                   <div className="space-y-1.5">
-                    <label className="text-xs font-medium text-foreground">호출할 MCP 도구 선택</label>
-                    <Select value={selectedTool} onValueChange={setSelectedTool}>
+                    <span id="mcp-tool-label" className="text-xs font-medium text-foreground">
+                      호출할 MCP 도구 선택
+                    </span>
+                    <Select value={selectedTool} onValueChange={setSelectedTool}
+                      aria-labelledby="mcp-tool-label">
                       <SelectTrigger className="h-9">
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="voicebox.hachuping">voicebox.hachuping (하츄핑 한국어/영어 즉시 발화)</SelectItem>
-                        <SelectItem value="voicebox.hachuping_en">voicebox.hachuping_en (하츄핑-영어 전용 발화)</SelectItem>
-                        <SelectItem value="voicebox.generate_audio">voicebox.generate_audio (동기식 오디오 파일 합성)</SelectItem>
-                        <SelectItem value="voicebox.speak">voicebox.speak (비동기 실시간 음성 발화)</SelectItem>
+                        <SelectItem value="voicebox.hachuping">
+                          voicebox.hachuping (하츄핑 한국어/영어 즉시 발화)
+                        </SelectItem>
+                        <SelectItem value="voicebox.hachuping_en">
+                          voicebox.hachuping_en (하츄핑-영어 전용 발화)
+                        </SelectItem>
+                        <SelectItem value="voicebox.generate_audio">
+                          voicebox.generate_audio (동기식 오디오 파일 합성)
+                        </SelectItem>
+                        <SelectItem value="voicebox.speak">
+                          voicebox.speak (비동기 실시간 음성 발화)
+                        </SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
 
                   {/* Profile Selection (if applicable) */}
-                  {(selectedTool === 'voicebox.speak' || selectedTool === 'voicebox.generate_audio') && (
+                  {(selectedTool === 'voicebox.speak' ||
+                    selectedTool === 'voicebox.generate_audio') && (
                     <div className="grid grid-cols-2 gap-3">
                       <div className="space-y-1.5">
-                        <label className="text-xs font-medium text-foreground">음성 프로필</label>
-                        <Select value={playgroundProfile} onValueChange={setPlaygroundProfile}>
+                        <span id="playground-profile-label" className="text-xs font-medium text-foreground">음성 프로필</span>
+                        <Select value={playgroundProfile} onValueChange={setPlaygroundProfile}
+                          aria-labelledby="playground-profile-label">
                           <SelectTrigger className="h-9">
                             <SelectValue />
                           </SelectTrigger>
@@ -965,8 +1174,9 @@ export function MCPTab() {
                       </div>
 
                       <div className="space-y-1.5">
-                        <label className="text-xs font-medium text-foreground">언어</label>
-                        <Select value={playgroundLang} onValueChange={setPlaygroundLang}>
+                        <span id="playground-lang-label" className="text-xs font-medium text-foreground">언어</span>
+                        <Select value={playgroundLang} onValueChange={setPlaygroundLang}
+                          aria-labelledby="playground-lang-label">
                           <SelectTrigger className="h-9">
                             <SelectValue />
                           </SelectTrigger>
@@ -984,32 +1194,48 @@ export function MCPTab() {
                   {/* Text Input */}
                   <div className="space-y-1.5">
                     <div className="flex items-center justify-between">
-                      <label className="text-xs font-medium text-foreground">입력 대사 (Text to Speak)</label>
+                      <label
+                        htmlFor="playground-text"
+                        className="text-xs font-medium text-foreground"
+                      >
+                        입력 대사 (Text to Speak)
+                      </label>
                       <div className="flex gap-1.5">
                         <button
                           type="button"
-                          className="text-[11px] text-accent hover:underline"
-                          onClick={() => setPlaygroundText('안녕 도아야! 오늘도 기분 좋은 하루 보내자, 츄~!')}
+                          className="text-xs text-accent hover:underline"
+                          onClick={() =>
+                            setPlaygroundText('안녕 도아야! 오늘도 기분 좋은 하루 보내자, 츄~!')
+                          }
                         >
                           [샘플 1]
                         </button>
                         <button
                           type="button"
-                          className="text-[11px] text-accent hover:underline"
-                          onClick={() => setPlaygroundText('Voicebox MCP 서버가 정상 가동 중입니다. 모든 요청을 처리할 준비가 되었습니다.')}
+                          className="text-xs text-accent hover:underline"
+                          onClick={() =>
+                            setPlaygroundText(
+                              'Voicebox MCP 서버가 정상 가동 중입니다. 모든 요청을 처리할 준비가 되었습니다.',
+                            )
+                          }
                         >
                           [샘플 2]
                         </button>
                         <button
                           type="button"
-                          className="text-[11px] text-accent hover:underline"
-                          onClick={() => setPlaygroundText('Hello Doa! You did such an amazing job today! Keep it up!')}
+                          className="text-xs text-accent hover:underline"
+                          onClick={() =>
+                            setPlaygroundText(
+                              'Hello Doa! You did such an amazing job today! Keep it up!',
+                            )
+                          }
                         >
                           [영어 샘플]
                         </button>
                       </div>
                     </div>
                     <Textarea
+                      id="playground-text"
                       rows={3}
                       value={playgroundText}
                       onChange={(e) => setPlaygroundText(e.target.value)}
@@ -1047,7 +1273,10 @@ export function MCPTab() {
                   <CardTitle className="text-base font-semibold flex items-center justify-between">
                     <span>실행 결과 (Execution Output)</span>
                     {playgroundAudioUrl && (
-                      <Badge variant="outline" className="text-xs text-emerald-400 border-emerald-500/30">
+                      <Badge
+                        variant="outline"
+                        className="text-xs text-emerald-400 border-emerald-500/30"
+                      >
                         오디오 재생 가능
                       </Badge>
                     )}
@@ -1066,13 +1295,21 @@ export function MCPTab() {
                         <a
                           href={playgroundAudioUrl}
                           download="mcp_test_output.wav"
-                          className="flex items-center gap-1 text-[11px] hover:underline"
+                          className="flex items-center gap-1 text-xs hover:underline"
                         >
                           <Download className="h-3 w-3" />
                           다운로드
                         </a>
                       </div>
-                      <audio controls src={playgroundAudioUrl} className="w-full h-8" autoPlay />
+                      <audio
+                        controls
+                        src={playgroundAudioUrl}
+                        className="w-full h-8"
+                      >
+                        {/* biome-ignore lint/a11y/useMediaCaption: TTS captions not
+                            available — voice output is the synthesized speech itself. */}
+                        <track kind="captions" />
+                      </audio>
                     </div>
                   ) : (
                     <div className="py-6 border border-dashed border-border/70 rounded-lg flex flex-col items-center justify-center text-muted-foreground text-xs">
@@ -1083,8 +1320,10 @@ export function MCPTab() {
 
                   {/* Result JSON Viewer */}
                   <div className="space-y-1.5">
-                    <div className="text-xs font-medium text-muted-foreground">JSON 응답 데이터</div>
-                    <pre className="text-[11px] font-mono p-3 rounded-lg bg-black/40 border border-white/5 overflow-x-auto min-h-[160px] text-emerald-400">
+                    <div className="text-xs font-medium text-muted-foreground">
+                      JSON 응답 데이터
+                    </div>
+                    <pre className="text-xs font-mono p-3 rounded-lg bg-[#0f172a] border border-white/5 overflow-x-auto min-h-[160px] text-emerald-400">
                       {playgroundResult
                         ? JSON.stringify(playgroundResult, null, 2)
                         : '// 도구를 실행하면 응답 JSON이 출력됩니다.'}
@@ -1104,9 +1343,12 @@ export function MCPTab() {
             <CardHeader className="pb-3">
               <div className="flex items-center justify-between">
                 <div>
-                  <CardTitle className="text-base font-semibold">클라이언트별 기본 음성 바인딩</CardTitle>
+                  <CardTitle className="text-base font-semibold">
+                    클라이언트별 기본 음성 바인딩
+                  </CardTitle>
                   <CardDescription className="text-xs mt-0.5">
-                    <code>X-Voicebox-Client-Id</code> 헤더 값(예: <code>claude-code</code>, <code>antigravity</code>)에 따라 사용할 목소리를 고정 매핑합니다.
+                    <code>X-Voicebox-Client-Id</code> 헤더 값(예: <code>claude-code</code>,{' '}
+                    <code>antigravity</code>)에 따라 사용할 목소리를 고정 매핑합니다.
                   </CardDescription>
                 </div>
                 <div className="flex items-center gap-2">
@@ -1144,11 +1386,18 @@ export function MCPTab() {
               ) : (
                 <div className="divide-y divide-border/60 border rounded-lg overflow-hidden">
                   {bindings.map((b) => (
-                    <div key={b.client_id} className="p-3 grid grid-cols-[1fr_auto_auto] gap-4 items-center bg-card/30">
+                    <div
+                      key={b.client_id}
+                      className="p-3 grid grid-cols-[1fr_auto_auto] gap-4 items-center bg-card/30"
+                    >
                       <div className="min-w-0">
-                        <div className="font-medium text-xs truncate text-foreground">{b.label || b.client_id}</div>
-                        <div className="text-[11px] text-muted-foreground truncate flex items-center gap-1.5 mt-0.5">
-                          <code className="text-accent bg-accent/10 px-1 rounded">{b.client_id}</code>
+                        <div className="font-medium text-xs truncate text-foreground">
+                          {b.label || b.client_id}
+                        </div>
+                        <div className="text-xs text-muted-foreground truncate flex items-center gap-1.5 mt-0.5">
+                          <code className="text-accent bg-accent/10 px-1 rounded">
+                            {b.client_id}
+                          </code>
                           <span>·</span>
                           {b.last_seen_at ? (
                             <span className="text-emerald-400">
@@ -1199,7 +1448,9 @@ export function MCPTab() {
 
               {/* Add New Binding Form */}
               <div className="pt-2 space-y-2">
-                <div className="text-xs font-semibold text-foreground">새 클라이언트 바인딩 추가</div>
+                <div className="text-xs font-semibold text-foreground">
+                  새 클라이언트 바인딩 추가
+                </div>
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
                   <Input
                     placeholder="Client ID (예: cursor, claude-code)"
@@ -1243,6 +1494,13 @@ export function MCPTab() {
               </div>
             </CardContent>
           </Card>
+        </TabsContent>
+
+        {/* ══════════════════════════════════════════════════════════════ */}
+        {/* 5. AI Prompt Tab                                               */}
+        {/* ══════════════════════════════════════════════════════════════ */}
+        <TabsContent value="ai-prompt" className="space-y-6">
+          <AIPromptCard profiles={profiles ?? []} mcpUrl={mcpUrl} />
         </TabsContent>
       </Tabs>
     </div>

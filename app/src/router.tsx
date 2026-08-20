@@ -241,6 +241,11 @@ const routeTree = rootRoute.addChildren([
 // Create router
 export const router = createRouter({ routeTree });
 
+// Expose router only in dev for debugging; production builds must not pollute window.
+if (import.meta.env.DEV && typeof window !== 'undefined') {
+  (window as unknown as { __voiceboxRouter: typeof router }).__voiceboxRouter = router;
+}
+
 // Register router for type safety
 declare module '@tanstack/react-router' {
   interface Register {

@@ -10,12 +10,19 @@ services:
 
     ports:
       # Host-side moved to 17600 so the dev/installed Voicebox can keep 17493.
-      # Container still listens on its native port internally.
-      - "127.0.0.1:17600:17493"
+      # SECURITY: Bind to 0.0.0.0 to allow access from other PCs on the same
+      # network. The voicebox server has no auth layer — anyone on the LAN
+      # can run arbitrary TTS jobs and consume GPU resources.  For loopback-
+      # only setups, override via `VOICEBOX_BIND=127.0.0.1` env or use
+      # `docker-compose.lan.example.yml` and bind to a specific LAN IP.
+      - "${VOICEBOX_BIND:-0.0.0.0}:17600:17493"
 
     volumes:
       # Bind-mount the entire data directory to share DB, profiles, and generations with the local host
       - ./data:/app/data
+
+      # Bind-mount certs to enable HTTPS in Docker (required for microphone access)
+      - ./certs:/app/certs:ro
 
       # HuggingFace model cache (so models aren't re-downloaded on rebuild)
       - huggingface-cache:/home/voicebox/.cache/huggingface
@@ -23,6 +30,8 @@ services:
     environment:
       - LOG_LEVEL=info
       - NUMBA_CACHE_DIR=/tmp/numba_cache
+      # Prevent PyTorch deadlocks on aarch64 Docker containers (Apple Silicon)
+      - OMP_NUM_THREADS=1
 
     networks:
       - voicebox-net

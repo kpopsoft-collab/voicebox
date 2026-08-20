@@ -179,8 +179,12 @@ def _configure_cors(application: FastAPI) -> None:
     default_origins = [
         "http://localhost:5173",  # Vite dev server
         "http://127.0.0.1:5173",
+        "https://localhost:5173",  # Vite dev server (HTTPS)
+        "https://127.0.0.1:5173",
         "http://localhost:17493",
         "http://127.0.0.1:17493",
+        "https://localhost:17493",  # Backend (HTTPS)
+        "https://127.0.0.1:17493",
         "tauri://localhost",  # Tauri webview (macOS)
         "https://tauri.localhost",  # Tauri webview (Windows/Linux)
         "http://tauri.localhost",  # Tauri webview (Windows, some builds)
@@ -191,7 +195,10 @@ def _configure_cors(application: FastAPI) -> None:
     application.add_middleware(
         CORSMiddleware,
         allow_origins=all_origins,
-        allow_origin_regex=r"^https?://.*",
+        # SECURITY: explicit whitelist only. The previous `r"^https?://.*"` regex
+        # combined with allow_credentials=True effectively trusted every origin on
+        # the internet for credentialed requests (CSRF). Local-first app — no need
+        # for a wildcard. Add new origins to default_origins or VOICEBOX_CORS_ORIGINS.
         allow_credentials=True,
         allow_methods=["*"],
         allow_headers=["*"],

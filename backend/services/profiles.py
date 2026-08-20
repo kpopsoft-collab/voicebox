@@ -25,6 +25,10 @@ from ..utils.images import process_avatar, validate_image
 
 logger = logging.getLogger(__name__)
 
+# Engines that can produce a voice prompt from reference audio.
+# NOTE: `stable_audio_3` is intentionally omitted — it is a text→SFX engine
+# with no voice-cloning concept. Its profiles use the `preset` voice_type
+# path validated via `_get_preset_voice_ids` below.
 CLONING_ENGINES = {"qwen", "luxtts", "chatterbox", "chatterbox_turbo", "tada", "melotts"}
 
 
@@ -76,6 +80,9 @@ def _get_preset_voice_ids(engine: str) -> set[str]:
 
     if engine == "melotts":
         return {"KR"}
+
+    if engine == "stable_audio_3":
+        return {"sfx"}
 
     return set()
 

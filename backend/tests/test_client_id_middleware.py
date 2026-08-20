@@ -8,7 +8,7 @@ auto-created for new REST callers.
 
 import pytest
 
-from backend.mcp_server.context import _is_stamped_path
+from backend.mcp_server.context import _is_stamped_path, is_valid_client_id
 
 
 @pytest.mark.parametrize(
@@ -47,3 +47,39 @@ def test_mcp_semantic_paths_are_stamped(path: str) -> None:
 )
 def test_other_paths_are_not_stamped(path: str) -> None:
     assert _is_stamped_path(path) is False
+
+
+@pytest.mark.parametrize(
+    "value",
+    [
+        None,
+        "",
+        "claude-code",
+        "antigravity-a1b2c3",
+        "test",
+        "a",
+        "a:b:c",
+        "foo_bar.baz",
+        "a" * 128,  # exactly MAX_CLIENT_ID_LEN — boundary
+    ],
+)
+def test_client_id_validator_accepts_safe(value: str | None) -> None:
+    assert is_valid_client_id(value) is True
+
+
+@pytest.mark.parametrize(
+    "value",
+    [
+        "has space",
+        "<script>alert(1)</script>",
+        "a" * 129,  # one past MAX_CLIENT_ID_LEN
+        "foo\nbar",  # newline
+        "foo\x00bar",  # NUL
+        "foo/bar",  # path separator
+        "../etc/passwd",  # path traversal
+        "한국어",  # non-ASCII
+        "foo bar",  # internal whitespace
+    ],
+)
+def test_client_id_validator_rejects_unsafe(value: str) -> None:
+    assert is_valid_client_id(value) is False

@@ -44,6 +44,12 @@ export function ProfileCard({ profile, disabled }: ProfileCardProps) {
   const setAudioWithAutoPlay = usePlayerStore((state) => state.setAudioWithAutoPlay);
 
   const isSelected = selectedProfileId === profile.id;
+  // Profiles with no reference audio can't be previewed — show a tooltip instead
+  // of silently no-op'ing on click so users understand why nothing plays.
+  const hasSamples = profile.sample_count > 0;
+  const noSamplesTitle = !hasSamples
+    ? t('profiles.card.noSamples', { defaultValue: '샘플 오디오가 없어 미리듣기를 재생할 수 없습니다' })
+    : undefined;
 
   const handleSelect = () => {
     if (disabled && isSelected) {
@@ -52,7 +58,7 @@ export function ProfileCard({ profile, disabled }: ProfileCardProps) {
       return;
     }
 
-    if (!isSelected) {
+    if (!isSelected && hasSamples) {
       (async () => {
         try {
           const serverUrl = useServerStore.getState().serverUrl;
@@ -118,6 +124,8 @@ export function ProfileCard({ profile, disabled }: ProfileCardProps) {
         role="button"
         aria-label={selectLabel}
         aria-pressed={isSelected}
+        aria-disabled={!hasSamples && !isSelected}
+        title={noSamplesTitle}
         onKeyDown={handleKeyDown}
       >
         <CardHeader className="p-3 pb-2">

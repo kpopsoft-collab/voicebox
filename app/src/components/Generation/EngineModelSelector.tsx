@@ -5,6 +5,8 @@ import {
   Select,
   SelectContent,
   SelectItem,
+  SelectLabel,
+  SelectSeparator,
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
@@ -12,23 +14,35 @@ import type { VoiceProfileResponse } from '@/lib/api/types';
 import { getLanguageOptionsForEngine } from '@/lib/constants/languages';
 import type { GenerationFormValues } from '@/lib/hooks/useGenerationForm';
 
+/** Engine category for grouping in the picker UI. */
+type EngineCategory = 'tts' | 'sfx';
+
 /**
  * Engine/model options and their display metadata.
- * Adding a new engine means adding one entry here.
+ * `category` controls which group the option lands in (TTS vs SFX). SFX
+ * engines produce sound effects from text — they don't generate speech and
+ * shouldn't be co-mingled with TTS clones, so the UI groups them separately
+ * and cloned-profile filters hide them automatically.
  */
-const ENGINE_OPTIONS = [
-  { value: 'qwen:1.7B', label: 'Qwen3-TTS 1.7B', engine: 'qwen' },
-  { value: 'qwen:0.6B', label: 'Qwen3-TTS 0.6B', engine: 'qwen' },
-  { value: 'qwen_custom_voice:1.7B', label: 'Qwen CustomVoice 1.7B', engine: 'qwen_custom_voice' },
-  { value: 'qwen_custom_voice:0.6B', label: 'Qwen CustomVoice 0.6B', engine: 'qwen_custom_voice' },
-  { value: 'luxtts', label: 'LuxTTS', engine: 'luxtts' },
-  { value: 'chatterbox', label: 'Chatterbox', engine: 'chatterbox' },
-  { value: 'chatterbox_turbo', label: 'Chatterbox Turbo', engine: 'chatterbox_turbo' },
-  { value: 'tada:1B', label: 'TADA 1B', engine: 'tada' },
-  { value: 'tada:3B', label: 'TADA 3B Multilingual', engine: 'tada' },
-  { value: 'kokoro', label: 'Kokoro 82M', engine: 'kokoro' },
-  { value: 'melotts', label: 'MeloTTS (Korean)', engine: 'melotts' },
-] as const;
+const ENGINE_OPTIONS: readonly {
+  value: string;
+  label: string;
+  engine: string;
+  category: EngineCategory;
+}[] = [
+  { value: 'qwen:1.7B', label: 'Qwen3-TTS 1.7B', engine: 'qwen', category: 'tts' },
+  { value: 'qwen:0.6B', label: 'Qwen3-TTS 0.6B', engine: 'qwen', category: 'tts' },
+  { value: 'qwen_custom_voice:1.7B', label: 'Qwen CustomVoice 1.7B', engine: 'qwen_custom_voice', category: 'tts' },
+  { value: 'qwen_custom_voice:0.6B', label: 'Qwen CustomVoice 0.6B', engine: 'qwen_custom_voice', category: 'tts' },
+  { value: 'luxtts', label: 'LuxTTS', engine: 'luxtts', category: 'tts' },
+  { value: 'chatterbox', label: 'Chatterbox', engine: 'chatterbox', category: 'tts' },
+  { value: 'chatterbox_turbo', label: 'Chatterbox Turbo', engine: 'chatterbox_turbo', category: 'tts' },
+  { value: 'tada:1B', label: 'TADA 1B', engine: 'tada', category: 'tts' },
+  { value: 'tada:3B', label: 'TADA 3B Multilingual', engine: 'tada', category: 'tts' },
+  { value: 'kokoro', label: 'Kokoro 82M', engine: 'kokoro', category: 'tts' },
+  { value: 'melotts', label: 'MeloTTS (Korean)', engine: 'melotts', category: 'tts' },
+  { value: 'stable_audio_3', label: 'Stable Audio 3 SFX', engine: 'stable_audio_3', category: 'sfx' },
+];
 
 const ENGINE_DESCRIPTIONS: Record<string, string> = {
   qwen: 'Multi-language, two sizes',
@@ -37,18 +51,24 @@ const ENGINE_DESCRIPTIONS: Record<string, string> = {
   chatterbox: '23 languages, incl. Hebrew',
   chatterbox_turbo: 'English, [laugh] [cough] tags',
   tada: 'HumeAI, 700s+ coherent audio',
-  kokoro: '82M params, CPU realtime, 8 langs',
-  melotts: 'Fast & clear Korean pronunciation',
+  kokoro: '82M param, extremely fast',
+  melotts: 'Korean speech engine',
+  stable_audio_3: 'Text-to-SFX engine',
 };
 
 /** Engines that only support English and should force language to 'en' on select. */
-const ENGLISH_ONLY_ENGINES = new Set(['luxtts', 'chatterbox_turbo']);
+const ENGLISH_ONLY_ENGINES = new Set(['luxtts', 'chatterbox_turbo', 'stable_audio_3']);
 
 /** Engines that support cloned (reference audio) profiles. */
 const CLONING_ENGINES = new Set(['qwen', 'luxtts', 'chatterbox', 'chatterbox_turbo', 'tada', 'melotts']);
 
 function getAvailableOptions(selectedProfile?: VoiceProfileResponse | null) {
   if (!selectedProfile) return ENGINE_OPTIONS;
+  // Cloned profiles cannot drive SFX engines — the prompts have nothing to do
+  // with each other (SFX doesn't accept reference audio).
+  if ((selectedProfile.voice_type || 'cloned') === 'cloned') {
+    return ENGINE_OPTIONS.filter((opt) => opt.category === 'tts');
+  }
   return ENGINE_OPTIONS.filter((opt) => isProfileCompatibleWithEngine(selectedProfile, opt.engine));
 }
 
@@ -134,6 +154,13 @@ export function EngineModelSelector({ form, compact, selectedProfile }: EngineMo
     ? 'h-8 text-xs bg-card border-border rounded-full hover:bg-background/50 transition-all'
     : undefined;
 
+  // Group by category so SFX engines (Stable Audio 3) sit under a separate
+  // "Sound Effects" header instead of mixing with cloned TTS engines. If only
+  // one category has options, no separator/label is rendered.
+  const ttsOptions = availableOptions.filter((opt) => opt.category === 'tts');
+  const sfxOptions = availableOptions.filter((opt) => opt.category === 'sfx');
+  const showBothGroups = ttsOptions.length > 0 && sfxOptions.length > 0;
+
   return (
     <Select value={selectValue} onValueChange={(v) => applyEngineSelection(form, v)}>
       <FormControl>
@@ -142,11 +169,27 @@ export function EngineModelSelector({ form, compact, selectedProfile }: EngineMo
         </SelectTrigger>
       </FormControl>
       <SelectContent side={compact ? 'top' : undefined}>
-        {availableOptions.map((opt) => (
-          <SelectItem key={opt.value} value={opt.value} className={itemClass}>
-            {opt.label}
-          </SelectItem>
-        ))}
+        {ttsOptions.length > 0 && (
+          <>
+            {showBothGroups && <SelectLabel>음성 합성 (TTS)</SelectLabel>}
+            {ttsOptions.map((opt) => (
+              <SelectItem key={opt.value} value={opt.value} className={itemClass}>
+                {opt.label}
+              </SelectItem>
+            ))}
+          </>
+        )}
+        {sfxOptions.length > 0 && (
+          <>
+            {showBothGroups && <SelectSeparator />}
+            {showBothGroups && <SelectLabel>효과음 (SFX)</SelectLabel>}
+            {sfxOptions.map((opt) => (
+              <SelectItem key={opt.value} value={opt.value} className={itemClass}>
+                {opt.label}
+              </SelectItem>
+            ))}
+          </>
+        )}
       </SelectContent>
     </Select>
   );

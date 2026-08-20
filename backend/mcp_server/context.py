@@ -27,6 +27,33 @@ _pending_stamps: set[asyncio.Task] = set()
 
 CLIENT_ID_HEADER = "X-Voicebox-Client-Id"
 
+# Bound the client_id length so a malformed header cannot blow up SQLite rows,
+# log lines, or the binding-detail UI. Anything longer than this is dropped
+# silently so legitimate callers aren't affected — they should still fit in
+# well under this cap (e.g. "claude-code", "antigravity-<uuid>").
+MAX_CLIENT_ID_LEN = 128
+
+# Allow only ASCII letters / digits / a small set of common punctuation so
+# the id doesn't carry HTML, control bytes, or unicode whitespace that could
+# confuse downstream rendering / SQL string comparisons.
+import re as _re
+
+_CLIENT_ID_RE = _re.compile(r"^[A-Za-z0-9._:-]{1,128}$")
+
+
+def is_valid_client_id(value: str | None) -> bool:
+    """True if `value` is acceptable as an MCP client identifier.
+
+    Empty / None headers are valid (they just mean "no per-client binding"
+    — the request still goes through with the global default). Anything
+    longer than ``MAX_CLIENT_ID_LEN`` or containing characters outside the
+    safe alphabet is rejected so a malicious client cannot smuggled HTML,
+    control bytes, or path separators into the binding store.
+    """
+    if value is None or value == "":
+        return True
+    return _CLIENT_ID_RE.match(value) is not None
+
 # Tool handlers read this to apply per-client voice bindings.
 current_client_id: ContextVar[str | None] = ContextVar(
     "current_client_id", default=None
@@ -80,7 +107,19 @@ class ClientIdMiddleware(BaseHTTPMiddleware):
         super().__init__(app)
 
     async def dispatch(self, request: Request, call_next) -> Response:
-        client_id = request.headers.get(CLIENT_ID_HEADER)
+        raw_client_id = request.headers.get(CLIENT_ID_HEADER)
+        # Normalise: an empty / invalid header becomes None. This prevents a
+        # malformed value from creating an unbounded binding row or being
+        # echoed back into UI / logs.
+        if not is_valid_client_id(raw_client_id):
+            logger.warning(
+                "Rejected malformed X-Voicebox-Client-Id (len=%d, remote=%s)",
+                len(raw_client_id) if raw_client_id else 0,
+                request.client.host if request.client else "?",
+            )
+            client_id: str | None = None
+        else:
+            client_id = raw_client_id or None
         remote_addr = request.client.host if request.client else None
         client_token = current_client_id.set(client_id)
         addr_token = current_remote_addr.set(remote_addr)

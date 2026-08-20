@@ -47,6 +47,11 @@ logs/
 .env
 .env.local
 
+# Local dev TLS certs (private key — never commit)
+certs/key.pem
+certs/cert.pem
+!certs/.gitkeep
+
 # Generated files
 app/openapi.json
 tauri/src-tauri/binaries/*

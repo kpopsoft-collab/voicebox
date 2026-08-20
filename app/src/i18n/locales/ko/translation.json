@@ -402,7 +402,8 @@
       "edit": "프로필 편집",
       "delete": "프로필 삭제",
       "selectLabel": "{{name}}, {{language}}. 생성할 음성으로 선택하세요.",
-      "selectLabelSelected": "{{name}}, {{language}}. 생성할 음성으로 선택됨."
+      "selectLabelSelected": "{{name}}, {{language}}. 생성할 음성으로 선택됨.",
+      "noSamples": "샘플 오디오가 없어 미리듣기를 재생할 수 없습니다"
     },
     "list": {
       "errorLoading": "프로필 로딩 오류: {{message}}",
@@ -974,7 +975,7 @@
         },
         "selfCorrection": {
           "title": "자기 수정 제거",
-          "description": "문장 중간에 마음을 바꾼 경우(\\\"아니, 사실...\\\", \\\"잠깐, 그게 아니라...\\\"), 철회된 부분을 제거하고 최종 의도를 유지합니다."
+          "description": "문장 중간에 마음을 바꾼 경우(\"아니, 사실...\", \"잠깐, 그게 아니라...\"), 철회된 부분을 제거하고 최종 의도를 유지합니다."
         },
         "preserveTechnical": {
           "title": "기술 용어 보존",
@@ -983,7 +984,7 @@
       },
       "playback": {
         "title": "재생",
-        "description": "캡처 탭의 \\\"Play as\\\" 작업에 사용할 기본 음성입니다.",
+        "description": "캡처 탭의 \"Play as\" 작업에 사용할 기본 음성입니다.",
         "defaultVoice": {
           "title": "기본 음성",
           "description": "음성을 먼저 선택하지 않고 Play as를 클릭할 때 사용됩니다. 캡처별로 변경할 수 있습니다.",

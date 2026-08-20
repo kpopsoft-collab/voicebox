@@ -69,6 +69,8 @@ RUN pip install --no-cache-dir --prefix=/install --no-deps chatterbox-tts
 RUN pip install --no-cache-dir --prefix=/install --no-deps hume-tada
 RUN pip install --no-cache-dir --prefix=/install \
     git+https://github.com/QwenLM/Qwen3-TTS.git
+RUN pip install --no-cache-dir --prefix=/install --no-deps \
+    git+https://github.com/Stability-AI/stable-audio-3.git
 
 
 # === Stage 3: Runtime ===
@@ -103,9 +105,12 @@ RUN mkdir -p /app/data/generations /app/data/profiles /app/data/cache \
 # Expose the API port
 EXPOSE 17493
 
-# Health check — auto-restart if the server hangs
+# Health check — auto-restart if the server hangs. Try HTTPS first with the
+# bundled dev cert, then plain HTTP. We deliberately do *not* use `curl -k`
+# here: that would let any cert (including an expired or unrelated one) pass
+# the healthcheck and silently mask TLS regressions.
 HEALTHCHECK --interval=30s --timeout=10s --retries=3 --start-period=60s \
-    CMD curl -f http://localhost:17493/health || exit 1
+    CMD curl -f --cacert /app/certs/cert.pem https://localhost:17493/health || curl -f http://localhost:17493/health || exit 1
 
 # Entrypoint joins GPU groups then drops to the voicebox user.
 # Normalize CRLF (a Windows checkout otherwise leaves the shebang as

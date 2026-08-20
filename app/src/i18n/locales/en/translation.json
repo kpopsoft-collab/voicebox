@@ -402,7 +402,8 @@
       "edit": "Edit profile",
       "delete": "Delete profile",
       "selectLabel": "{{name}}, {{language}}. Select as voice for generation.",
-      "selectLabelSelected": "{{name}}, {{language}}. Selected as voice for generation."
+      "selectLabelSelected": "{{name}}, {{language}}. Selected as voice for generation.",
+      "noSamples": "No reference audio — preview cannot be played"
     },
     "list": {
       "errorLoading": "Error loading profiles: {{message}}",

@@ -72,6 +72,7 @@ import { useCaptureSettings } from '@/lib/hooks/useSettings';
 import { cn } from '@/lib/utils/cn';
 import { formatAbsoluteDate, formatDate } from '@/lib/utils/format';
 import { displayLabelForKey, modifierSideHint } from '@/lib/utils/keyCodes';
+import { usePlatform } from '@/platform/PlatformContext';
 import { useGenerationStore } from '@/stores/generationStore';
 import { usePlayerStore } from '@/stores/playerStore';
 
@@ -133,6 +134,7 @@ type PlaybackState = 'idle' | 'generating' | 'playing';
 
 export function CapturesTab() {
   const { t } = useTranslation();
+  const platform = usePlatform();
   const queryClient = useQueryClient();
   const { toast } = useToast();
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -202,9 +204,16 @@ export function CapturesTab() {
   // the race window between ``setSelectedId(new)`` and the refetched list
   // actually containing the new row.
   useEffect(() => {
+    if (!platform.metadata.isTauri) return;
+    // Guard against `listen()` promise resolving after the component unmounts.
+    // Without this, unmount-asynchronous captures can fire `setQueryData` /
+    // `setSelectedId` on a stale component, triggering React 18 "state update on
+    // unmounted component" warnings and a small leak per disconnect.
+    let cancelled = false;
     const unlistens: Promise<UnlistenFn>[] = [];
     unlistens.push(
       listen<{ capture: CaptureResponse }>('capture:created', (event) => {
+        if (cancelled) return;
         const capture = event.payload?.capture;
         if (capture) {
           queryClient.setQueryData<CaptureListResponse>(['captures'], (prev) => {
@@ -219,13 +228,15 @@ export function CapturesTab() {
     );
     unlistens.push(
       listen('capture:updated', () => {
+        if (cancelled) return;
         queryClient.invalidateQueries({ queryKey: ['captures'] });
       }),
     );
     return () => {
+      cancelled = true;
       for (const p of unlistens) p.then((fn) => fn()).catch(() => {});
     };
-  }, [queryClient]);
+  }, [platform.metadata.isTauri, queryClient]);
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();

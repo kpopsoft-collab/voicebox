@@ -61,6 +61,15 @@ numba>=0.60.0,<0.61.0
 pedalboard>=0.9.0
 demucs>=4.0.0
 
+# Stable Audio 3 (Sound Effects generation)
+# Installed from source via PEP 508 direct-reference. The Dockerfile installs it
+# with `pip --no-deps` to avoid the upstream's pinned numpy<1.26 / torch==2.6
+# conflicting with Python 3.11+; local dev installs will pull full deps.
+einops>=0.8.2
+einops-exts>=0.0.4
+safetensors>=0.7.0
+stable-audio-3 @ git+https://github.com/Stability-AI/stable-audio-3.git
+
 # HTTP client (for CUDA backend download)
 httpx>=0.27.0
 
